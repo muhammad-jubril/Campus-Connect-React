@@ -1,0 +1,37 @@
+/* Ported directly from the vanilla build's css/base.css :root block —
+   keeps the exact same visual identity through the rewrite. */
+:root {
+  --primary: #1E5C3E;
+  --primary-dark: #123C28;
+  --secondary: #7A4A24;
+  --accent-red: #B23A2E;
+  --ink: #1C1B17;
+  --surface: #FFFFFF;
+  --bg: #F4F2ED;
+  --line: rgba(28, 27, 23, 0.12);
+  --radius: 14px;
+  --shadow: 0 1px 2px rgba(28,27,23,0.04), 0 4px 12px rgba(28,27,23,0.06);
+  --shadow-lg: 0 8px 24px rgba(18,60,40,0.12), 0 2px 6px rgba(18,60,40,0.08);
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: 'Inter', system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  min-height: 100vh;
+  overflow-x: hidden;
+  position: relative;
+}
+
+h1, h2, h3, .display {
+  font-family: 'Sora', 'Inter', system-ui, sans-serif;
+  font-weight: 600;
+  letter-spacing: -0.015em;
+  margin: 0;
+}
+
+.mono { font-family: 'IBM Plex Mono', monospace; }
