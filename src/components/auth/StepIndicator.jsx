@@ -1,9 +1,9 @@
-const STEP_LABELS = ["Account", "Verify email", "Profile"];
+const STEP_LABELS = ["Account", "Email", "Profile", "Verify"];
 
 export default function StepIndicator({ current }) {
   return (
     <div className="step-indicator">
-      {[1, 2, 3].map((i) => {
+      {[1, 2, 3, 4].map((i) => {
         const state = i < current ? "completed" : i === current ? "current" : "upcoming";
         return (
           <div key={i} style={{ display: "contents" }}>
@@ -17,7 +17,7 @@ export default function StepIndicator({ current }) {
               </div>
               <div className="step-label">{STEP_LABELS[i - 1]}</div>
             </div>
-            {i < 3 && <div className={`step-line ${i < current ? "completed" : ""}`} />}
+            {i < 4 && <div className={`step-line ${i < current ? "completed" : ""}`} />}
           </div>
         );
       })}
