@@ -1,27 +1,17 @@
 import { useRef, useState } from "react";
 import BackButton from "../common/BackButton";
 import FacultyDepartmentPicker from "../common/FacultyDepartmentPicker";
-import { createProfile } from "../../services/supabase/profiles";
-import { uploadToStorage } from "../../services/supabase/storage";
-import { getUser } from "../../services/supabase/auth";
-import { useLoader } from "../../hooks/useLoader";
 import { useToast } from "../../hooks/useToast";
 import { joinList } from "../../utils/validation";
 
-// Used both for a fresh signup's Step 3, and for resuming someone who
-// verified their email but closed the app before finishing this step
-// (see AuthContext's NEEDS_PROFILE_SETUP status) — either way, all this
-// needs is a username + email; it doesn't care how it got them.
-export default function ProfileSetup({ username, email, onComplete, onBack }) {
+export default function ProfileSetup({ onNext, onBack }) {
   const [avatarPreview, setAvatarPreview] = useState("");
   const [avatarFile, setAvatarFile] = useState(null);
   const [name, setName] = useState("");
   const [faculty, setFaculty] = useState("");
   const [department, setDepartment] = useState("");
   const [level, setLevel] = useState("");
-  const [submitting, setSubmitting] = useState(false);
   const fileInputRef = useRef(null);
-  const { runWithLoader } = useLoader();
   const { showToast } = useToast();
 
   function handleAvatarChange(e) {
@@ -33,8 +23,7 @@ export default function ProfileSetup({ username, email, onComplete, onBack }) {
     reader.readAsDataURL(file);
   }
 
-  async function handleFinish() {
-    if (submitting) return;
+  function handleContinue() {
     const missing = [];
     if (!name.trim()) missing.push("your name");
     if (!faculty) missing.push("your faculty");
@@ -44,41 +33,15 @@ export default function ProfileSetup({ username, email, onComplete, onBack }) {
       showToast(`Fill in ${joinList(missing)} to continue`, "error");
       return;
     }
-
-    setSubmitting(true);
-    try {
-      let profileRow;
-      await runWithLoader("Setting up your profile…", async () => {
-        const { data: userData, error: userError } = await getUser();
-        if (userError || !userData.user) throw userError || new Error("No signed-in user found");
-        const userId = userData.user.id;
-
-        let avatarUrl = "";
-        if (avatarFile) avatarUrl = await uploadToStorage("avatars", avatarFile, userId);
-
-        profileRow = {
-          id: userId, username, name: name.trim(), faculty, department, level, avatar_url: avatarUrl || null,
-        };
-        await createProfile(profileRow);
-      });
-      onComplete(profileRow);
-    } catch (err) {
-      console.error("Finishing signup failed:", err);
-      const msg = err && err.message && err.message.includes("duplicate")
-        ? "That username was just taken — go back and pick another"
-        : "Couldn't finish setting up your profile — check your connection and try again";
-      showToast(msg, "error");
-    } finally {
-      setSubmitting(false);
-    }
+    onNext({ name: name.trim(), faculty, department, level, avatarFile });
   }
 
   const valid = !!(name.trim() && faculty && department && level);
 
   return (
     <div className="screen-enter">
-      {onBack && <BackButton onClick={onBack} />}
-      <div className="eyebrow">STEP 3 OF 3</div>
+      <BackButton onClick={onBack} />
+      <div className="eyebrow">STEP 3 OF 4</div>
       <h2 className="display">Complete your profile</h2>
       <p className="subtitle">This is how other students will see you.</p>
 
@@ -109,8 +72,8 @@ export default function ProfileSetup({ username, email, onComplete, onBack }) {
       </div>
 
       <div className="spacer" />
-      <button type="button" className={`btn btn-primary ${!valid ? "is-invalid" : ""}`} onClick={handleFinish}>
-        Finish
+      <button type="button" className={`btn btn-primary ${!valid ? "is-invalid" : ""}`} onClick={handleContinue}>
+        Continue
       </button>
     </div>
   );
