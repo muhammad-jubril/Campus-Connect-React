@@ -12,7 +12,7 @@ export async function getProfileByUsername(username) {
 }
 
 export async function getProfile(userId) {
-  const { data, error } = await supabase.from("profiles").select("*").eq("id", userId).single();
+  const { data, error } = await supabase.from("profiles").select("*").eq("id", userId).maybeSingle();
   return { profile: data, error };
 }
 
