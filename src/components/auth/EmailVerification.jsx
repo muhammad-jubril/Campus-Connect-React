@@ -3,17 +3,12 @@ import BackButton from "../common/BackButton";
 import { useToast } from "../../hooks/useToast";
 import { EMAIL_RE } from "../../utils/validation";
 
-<<<<<<< HEAD
-export default function EmailVerification({ onNext, onBack }) {
-  const [email, setEmail] = useState("");
-=======
 export default function EmailVerification({
   initialEmail,
   onNext,
   onBack,
 }) {
   const [email, setEmail] = useState(initialEmail || "");
->>>>>>> 1322a16 (update)
   const [emailError, setEmailError] = useState(false);
   const { showToast } = useToast();
 
@@ -23,42 +18,29 @@ export default function EmailVerification({
       showToast("Enter a valid email address", "error");
       return;
     }
-<<<<<<< HEAD
-=======
 
->>>>>>> 1322a16 (update)
     onNext(email);
   }
 
   return (
     <div className="screen-enter">
       <BackButton onClick={onBack} />
-<<<<<<< HEAD
-      <div className="eyebrow">STEP 2 OF 4</div>
-      <h2 className="display">What's your email?</h2>
-      <p className="subtitle">We'll send you a verification code at the end.</p>
-=======
 
       <div className="eyebrow">STEP 2 OF 4</div>
       <h2 className="display">What's your email?</h2>
       <p className="subtitle">
         We'll send you a verification code at the end.
       </p>
->>>>>>> 1322a16 (update)
 
       <div className={`field ${emailError ? "has-error" : ""}`}>
         <label>Email address</label>
         <input
           type="email"
           value={email}
-<<<<<<< HEAD
-          onChange={(e) => { setEmail(e.target.value); setEmailError(false); }}
-=======
           onChange={(e) => {
             setEmail(e.target.value);
             setEmailError(false);
           }}
->>>>>>> 1322a16 (update)
           placeholder="you@example.com"
           autoComplete="email"
         />
@@ -66,9 +48,6 @@ export default function EmailVerification({
       </div>
 
       <div className="spacer" />
-<<<<<<< HEAD
-      <button type="button" className={`btn btn-primary ${!EMAIL_RE.test(email) ? "is-invalid" : ""}`} onClick={handleContinue}>
-=======
 
       <button
         type="button"
@@ -77,7 +56,6 @@ export default function EmailVerification({
         }`}
         onClick={handleContinue}
       >
->>>>>>> 1322a16 (update)
         Continue
       </button>
     </div>

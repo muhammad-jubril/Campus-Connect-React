@@ -1,9 +1,5 @@
 import { useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-<<<<<<< HEAD
-import BackButton from "../components/common/BackButton";
-=======
->>>>>>> 1322a16 (update)
 import FacultyDepartmentPicker from "../components/common/FacultyDepartmentPicker";
 import { useAuth } from "../hooks/useAuth";
 import { useLoader } from "../hooks/useLoader";
@@ -55,9 +51,6 @@ export default function EditProfilePage() {
         if (avatarFile) avatarUrl = await uploadToStorage("avatars", avatarFile, currentUser.id);
         await updateProfile(currentUser.id, { name: name.trim(), faculty, department, level, avatar_url: avatarUrl });
         setCurrentUser((prev) => ({
-<<<<<<< HEAD
-          ...prev, name: name.trim(), bio, faculty, department, level, avatarDataUrl: avatarUrl || "",
-=======
           ...prev,
           name: name.trim(),
           bio,
@@ -65,7 +58,6 @@ export default function EditProfilePage() {
           department,
           level,
           avatarDataUrl: avatarUrl || "",
->>>>>>> 1322a16 (update)
         }));
       });
       showToast("Profile updated");
@@ -79,19 +71,12 @@ export default function EditProfilePage() {
   }
 
   return (
-<<<<<<< HEAD
-    <div>
-      <BackButton onClick={() => navigate(-1)} />
-      <h2 className="display">Edit profile</h2>
-      <p className="subtitle">This is how other students will see you.</p>
-=======
     <div className="edit-profile-page">
       <div className="task-title">
         <span className="eyebrow">CAMPUS CONNECT</span>
         <h2 className="display">Edit profile</h2>
         <p>This is how other students will see you.</p>
       </div>
->>>>>>> 1322a16 (update)
 
       <input ref={fileInputRef} type="file" accept="image/*" style={{ display: "none" }} onChange={handleAvatarChange} />
       <div className="avatar-picker" onClick={() => fileInputRef.current?.click()}>
@@ -108,11 +93,7 @@ export default function EditProfilePage() {
         <textarea className="post-textarea" style={{ minHeight: 70 }} value={bio} maxLength={140} onChange={(e) => setBio(e.target.value)} placeholder="A short line about you" />
       </div>
 
-<<<<<<< HEAD
-      <FacultyDepartmentPicker faculty={faculty} department={department} onChange={({ faculty: f, department: d }) => { setFaculty(f); setDepartment(d); }} />
-=======
       <FacultyDepartmentPicker faculty={faculty} department={department} onChange={({ faculty: nextFaculty, department: nextDepartment }) => { setFaculty(nextFaculty); setDepartment(nextDepartment); }} />
->>>>>>> 1322a16 (update)
 
       <div className="field">
         <label>Level</label>

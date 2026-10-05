@@ -9,10 +9,7 @@ import StepIndicator from "../components/auth/StepIndicator";
 import ProfileSetup from "../components/auth/ProfileSetup";
 import ResetPassword from "../components/auth/ResetPassword";
 import AppLayout from "../components/layout/AppLayout";
-<<<<<<< HEAD
-=======
 import ScreenLayout from "../components/layout/ScreenLayout";
->>>>>>> 1322a16 (update)
 
 import LandingPage from "../pages/LandingPage";
 import LoginPage from "../pages/LoginPage";
@@ -24,38 +21,22 @@ import FeedPage from "../pages/FeedPage";
 import CreatePostPage from "../pages/CreatePostPage";
 import ProfilePage from "../pages/ProfilePage";
 import EditProfilePage from "../pages/EditProfilePage";
-<<<<<<< HEAD
-=======
 import SearchStudentsPage from "../pages/SearchStudentsPage";
->>>>>>> 1322a16 (update)
 import ComingSoonPage from "../pages/ComingSoonPage";
 import TermsPage from "../pages/TermsPage";
 import PrivacyPage from "../pages/PrivacyPage";
 import NotFoundPage from "../pages/NotFoundPage";
 
-<<<<<<< HEAD
-=======
 const icon = (path) => (
   <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
     <path d={path} />
   </svg>
 );
 
->>>>>>> 1322a16 (update)
 export default function AppRoutes() {
   const { status, pendingAccount, completeSignIn } = useAuth();
 
   if (status === STATUS.LOADING) {
-<<<<<<< HEAD
-    return <div style={{ display: "flex", flex: 1, alignItems: "center", justifyContent: "center" }}>Loading…</div>;
-  }
-
-  // These two statuses override whatever route was actually requested —
-  // same principle as the vanilla build's PASSWORD_RECOVERY auth-event
-  // listener and the "verified but no profile row" resume fix: someone in
-  // either state needs to land on ONE specific screen no matter what URL
-  // they hit, not get routed based on the URL like everything else.
-=======
     return (
       <div style={{ display: "flex", flex: 1, alignItems: "center", justifyContent: "center" }}>
         Loading…
@@ -63,7 +44,6 @@ export default function AppRoutes() {
     );
   }
 
->>>>>>> 1322a16 (update)
   if (status === STATUS.NEEDS_PROFILE_SETUP) {
     return (
       <AuthLayout>
@@ -99,25 +79,6 @@ export default function AppRoutes() {
 
       <Route element={<ProtectedRoute />}>
         <Route path="/welcome" element={<WelcomePage />} />
-<<<<<<< HEAD
-        <Route element={<AppLayout />}>
-          <Route path="/feed" element={<FeedPage />} />
-          <Route path="/create" element={<CreatePostPage />} />
-          <Route path="/profile" element={<ProfilePage />} />
-          <Route path="/profile/edit" element={<EditProfilePage />} />
-          <Route path="/profile/:username" element={<ProfilePage />} />
-          <Route
-            path="/marketplace"
-            element={<ComingSoonPage title="Marketplace" blurb="Buy, sell, and swap with other NWU students — not ported to React yet."
-              icon={<svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M4 9l1.5-5h13L20 9" /><path d="M4 9h16v10a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1z" /><path d="M9 13a3 3 0 0 0 6 0" /></svg>} />}
-          />
-          <Route
-            path="/notifications"
-            element={<ComingSoonPage title="Notifications" blurb="Likes, comments, and updates — not ported to React yet."
-              icon={<svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M6 8a6 6 0 0 1 12 0c0 5 2 6 2 6H4s2-1 2-6" /><path d="M10 20a2 2 0 0 0 4 0" /></svg>} />}
-          />
-        </Route>
-=======
 
         {/* The four primary destinations share the persistent app shell. */}
         <Route element={<AppLayout />}>
@@ -255,7 +216,6 @@ export default function AppRoutes() {
             </ScreenLayout>
           }
         />
->>>>>>> 1322a16 (update)
       </Route>
 
       <Route path="*" element={<NotFoundPage />} />
