@@ -15,6 +15,7 @@ export default function SignupPage() {
     password: "",
     email: "",
     profileData: null,
+    verificationStarted: false,
   });
   const navigate = useNavigate();
   const { completeSignIn } = useAuth();
@@ -22,6 +23,7 @@ export default function SignupPage() {
   return (
     <AuthLayout>
       <StepIndicator current={step} />
+
       {step === 1 && (
         <SignupForm
           initialUsername={data.username}
@@ -33,8 +35,10 @@ export default function SignupPage() {
           }}
         />
       )}
+
       {step === 2 && (
         <EmailVerification
+          initialEmail={data.email}
           onBack={() => setStep(1)}
           onNext={(email) => {
             setData((d) => ({ ...d, email }));
@@ -42,8 +46,10 @@ export default function SignupPage() {
           }}
         />
       )}
+
       {step === 3 && (
         <ProfileSetup
+          initialProfileData={data.profileData}
           onBack={() => setStep(2)}
           onNext={(profileData) => {
             setData((d) => ({ ...d, profileData }));
@@ -51,12 +57,17 @@ export default function SignupPage() {
           }}
         />
       )}
+
       {step === 4 && (
         <EmailVerificationFinal
           username={data.username}
           password={data.password}
           email={data.email}
           profileData={data.profileData}
+          initialShowOtp={data.verificationStarted}
+          onVerificationStarted={() =>
+            setData((d) => ({ ...d, verificationStarted: true }))
+          }
           onBack={() => setStep(3)}
           onComplete={(profileRow) => {
             completeSignIn(profileRow);
