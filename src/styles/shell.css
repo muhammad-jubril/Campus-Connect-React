@@ -186,6 +186,10 @@
   text-overflow: ellipsis;
 }
 
+.sidebar {
+  display: none;
+}
+
 /* ---------- Mobile bottom navigation ---------- */
 .bottom-nav {
   position: fixed;
@@ -283,7 +287,6 @@
 
 /* ---------- Mobile drawer ---------- */
 .drawer-overlay {
-  visibility: hidden;
   position: fixed;
   inset: 0;
   background: rgba(13, 29, 21, 0.48);
@@ -296,13 +299,11 @@
 }
 
 .drawer-overlay.open {
-  visibility: visible;
   opacity: 1;
   pointer-events: auto;
 }
 
 .drawer-panel {
-  visibility: hidden;
   position: fixed;
   top: 0;
   bottom: 0;
@@ -324,7 +325,6 @@
 }
 
 .drawer-panel.open {
-  visibility: visible;
   transform: translateX(0);
 }
 
