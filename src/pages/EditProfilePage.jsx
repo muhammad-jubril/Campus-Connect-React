@@ -8,6 +8,8 @@ import { updateProfile } from "../services/supabase/profiles";
 import { uploadToStorage } from "../services/supabase/storage";
 import { joinList } from "../utils/validation";
 
+const MAX_BIO_LENGTH = 160;
+
 export default function EditProfilePage() {
   const { currentUser, setCurrentUser } = useAuth();
   const [name, setName] = useState(currentUser.name);
@@ -47,13 +49,23 @@ export default function EditProfilePage() {
     setSubmitting(true);
     try {
       await runWithLoader("Saving changes…", async () => {
+        const savedName = name.trim();
+        const savedBio = bio.trim();
+        const bioValue = savedBio || null;
         let avatarUrl = currentUser.avatarDataUrl || null;
         if (avatarFile) avatarUrl = await uploadToStorage("avatars", avatarFile, currentUser.id);
-        await updateProfile(currentUser.id, { name: name.trim(), faculty, department, level, avatar_url: avatarUrl });
+        await updateProfile(currentUser.id, {
+          name: savedName,
+          bio: bioValue,
+          faculty,
+          department,
+          level,
+          avatar_url: avatarUrl,
+        });
         setCurrentUser((prev) => ({
           ...prev,
-          name: name.trim(),
-          bio,
+          name: savedName,
+          bio: savedBio,
           faculty,
           department,
           level,
@@ -90,7 +102,15 @@ export default function EditProfilePage() {
 
       <div className="field">
         <label>Bio</label>
-        <textarea className="post-textarea" style={{ minHeight: 70 }} value={bio} maxLength={140} onChange={(e) => setBio(e.target.value)} placeholder="A short line about you" />
+        <textarea
+          className="post-textarea"
+          style={{ minHeight: 70 }}
+          value={bio}
+          maxLength={MAX_BIO_LENGTH}
+          onChange={(e) => setBio(e.target.value)}
+          placeholder="A short line about you"
+        />
+        <div className="post-char-count"><span>{bio.length}</span>/{MAX_BIO_LENGTH}</div>
       </div>
 
       <FacultyDepartmentPicker faculty={faculty} department={department} onChange={({ faculty: nextFaculty, department: nextDepartment }) => { setFaculty(nextFaculty); setDepartment(nextDepartment); }} />

@@ -38,7 +38,7 @@ export function personFromProfileRow(row) {
     department: row.department || "",
     level: row.level || "",
     avatarDataUrl: row.avatar_url || "",
-    bio: "", // UI-only for now — no `bio` column exists in the schema yet
+    bio: row.bio || "",
     tone: (row.username || "").split("").reduce((sum, ch) => sum + ch.charCodeAt(0), 0) % 4,
   };
 }
