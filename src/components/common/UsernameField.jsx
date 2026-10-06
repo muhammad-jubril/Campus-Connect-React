@@ -13,9 +13,9 @@ export default function UsernameField({ value, onChange, hintText, hintState = "
         <input
           type="text"
           value={value}
-          maxLength={20}
+          maxLength={16}
           autoComplete="off"
-          onChange={(e) => onChange(e.target.value.replace(/[^a-zA-Z0-9_]/g, "").slice(0, 20))}
+          onChange={(e) => onChange(e.target.value.replace(/[^a-zA-Z0-9_]/g, "").slice(0, 16))}
           placeholder="e.g. aisha_bello"
         />
         <svg className="username-check" viewBox="0 0 24 24" width="18" height="18">

@@ -8,6 +8,7 @@ import { updateProfile } from "../services/supabase/profiles";
 import { uploadToStorage } from "../services/supabase/storage";
 import { joinList } from "../utils/validation";
 
+const MAX_NAME_LENGTH = 60;
 const MAX_BIO_LENGTH = 160;
 
 export default function EditProfilePage() {
@@ -97,7 +98,7 @@ export default function EditProfilePage() {
 
       <div className="field">
         <label>Full name</label>
-        <input type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder="Your name" />
+        <input type="text" value={name} maxLength={MAX_NAME_LENGTH} onChange={(e) => setName(e.target.value)} placeholder="Your name" />
       </div>
 
       <div className="field">

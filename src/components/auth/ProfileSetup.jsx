@@ -10,6 +10,8 @@ import { useLoader } from "../../hooks/useLoader";
 import { useToast } from "../../hooks/useToast";
 import { USERNAME_RE, joinList } from "../../utils/validation";
 
+const MAX_NAME_LENGTH = 60;
+
 export default function ProfileSetup({
   initialProfileData,
   onNext,
@@ -212,6 +214,7 @@ export default function ProfileSetup({
         <input
           type="text"
           value={name}
+          maxLength={MAX_NAME_LENGTH}
           onChange={(e) => setName(e.target.value)}
           placeholder="Your name"
         />

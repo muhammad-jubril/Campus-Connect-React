@@ -8,6 +8,7 @@ import { createPost } from "../services/supabase/posts";
 import { uploadToStorage } from "../services/supabase/storage";
 
 const MAX_CHARS = 600;
+const MAX_IMAGES = 10;
 
 export default function CreatePostPage() {
   const [text, setText] = useState("");
@@ -23,7 +24,7 @@ export default function CreatePostPage() {
   const { showToast } = useToast();
 
   function handleImagesChange(e) {
-    const files = Array.from(e.target.files).slice(0, 3 - images.length);
+    const files = Array.from(e.target.files).slice(0, MAX_IMAGES - images.length);
     files.forEach((file) => {
       const reader = new FileReader();
       reader.onload = (ev) => setImages((prev) => [...prev, { file, preview: ev.target.result }]);
@@ -95,7 +96,7 @@ export default function CreatePostPage() {
           <h2 className="display">New post</h2>
         </div>
       </div>
-      <p className="subtitle">Text, plus up to 3 images or one 30-second video.</p>
+      <p className="subtitle">Text, plus up to 10 images or one 30-second video.</p>
 
       <textarea
         id="post-text"
@@ -131,7 +132,7 @@ export default function CreatePostPage() {
       <input ref={videoInputRef} type="file" accept="video/*" style={{ display: "none" }} onChange={handleVideoChange} />
 
       <div className="post-media-actions">
-        <button type="button" className="media-action-btn" disabled={!!video || images.length >= 3} onClick={() => imageInputRef.current?.click()}>
+        <button type="button" className="media-action-btn" disabled={!!video || images.length >= MAX_IMAGES} onClick={() => imageInputRef.current?.click()}>
           <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="3" /><circle cx="8.5" cy="8.5" r="1.5" /><path d="m21 15-5-5L5 21" /></svg>
           Photo
         </button>
@@ -139,7 +140,7 @@ export default function CreatePostPage() {
           <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m23 7-7 5 7 5V7z" /><rect x="1" y="5" width="15" height="14" rx="2" /></svg>
           Video
         </button>
-        <span className="hint" style={{ margin: "0 0 0 auto" }}>{video ? "Video attached" : images.length ? `${images.length}/3 images` : ""}</span>
+        <span className="hint" style={{ margin: "0 0 0 auto" }}>{video ? "Video attached" : images.length ? `${images.length}/${MAX_IMAGES} images` : ""}</span>
       </div>
 
       <div className="spacer" />

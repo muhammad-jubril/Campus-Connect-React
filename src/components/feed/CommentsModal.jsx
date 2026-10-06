@@ -7,6 +7,8 @@ import { useToast } from "../../hooks/useToast";
 import { fetchCommentsFor, addComment } from "../../services/supabase/comments";
 import { timeAgo } from "../../utils/timeAgo";
 
+const MAX_COMMENT_LENGTH = 500;
+
 export default function CommentsModal() {
   const [comments, setComments] = useState(null); // null = loading
   const [text, setText] = useState("");
@@ -83,6 +85,7 @@ export default function CommentsModal() {
             ref={inputRef}
             type="text"
             value={text}
+            maxLength={MAX_COMMENT_LENGTH}
             onChange={(e) => setText(e.target.value)}
             onKeyDown={(e) => { if (e.key === "Enter") handleSend(); }}
             placeholder="Add a comment…"
