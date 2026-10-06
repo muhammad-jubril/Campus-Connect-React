@@ -82,10 +82,3 @@ export async function unlikePost(postId, userId) {
   const { error } = await supabase.from("likes").delete().eq("post_id", postId).eq("user_id", userId);
   if (error) throw error;
 }
-
-// Never for yourself liking/commenting on your own post — and RLS only
-// lets you insert a notification where you're the actor anyway.
-export async function notifyPostAuthor({ recipientId, actorId, type, postId }) {
-  if (!recipientId || recipientId === actorId) return;
-  await supabase.from("notifications").insert({ recipient_id: recipientId, actor_id: actorId, type, post_id: postId });
-}

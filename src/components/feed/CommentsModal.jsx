@@ -5,7 +5,6 @@ import { usePosts } from "../../hooks/usePosts";
 import { useAuth } from "../../hooks/useAuth";
 import { useToast } from "../../hooks/useToast";
 import { fetchCommentsFor, addComment } from "../../services/supabase/comments";
-import { notifyPostAuthor } from "../../services/supabase/posts";
 import { timeAgo } from "../../utils/timeAgo";
 
 export default function CommentsModal() {
@@ -40,7 +39,6 @@ export default function CommentsModal() {
       setComments((prev) => [...(prev || []), { authorUsername: currentUser.username, text: trimmed, createdAt: Date.now() }]);
       bumpCommentCount(post.id, 1);
       setText("");
-      notifyPostAuthor({ recipientId: post.authorId, actorId: currentUser.id, type: "comment", postId: post.id });
     } catch (err) {
       showToast("Couldn't send comment — check your connection", "error");
     } finally {

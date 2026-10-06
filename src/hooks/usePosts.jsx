@@ -46,13 +46,7 @@ export function PostsProvider({ children }) {
 
     try {
       if (wasLiked) await postsApi.unlikePost(postId, currentUser.id);
-      else {
-        await postsApi.likePost(postId, currentUser.id);
-        postsApi.notifyPostAuthor({
-          recipientId: target.authorId, actorId: currentUser.id,
-          actorUsername: currentUser.username, type: "like", postId,
-        });
-      }
+      else await postsApi.likePost(postId, currentUser.id);
     } catch (err) {
       setPosts((prev) => prev.map((p) => p.id === postId ? { ...p, liked: wasLiked, likes: p.likes + (wasLiked ? 1 : -1) } : p));
       showToast("Couldn't update like — check your connection", "error");
