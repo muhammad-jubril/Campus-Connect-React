@@ -1,11 +1,14 @@
 import { useRef, useState } from "react";
 import BackButton from "../common/BackButton";
+import UsernameField from "../common/UsernameField";
 import FacultyDepartmentPicker from "../common/FacultyDepartmentPicker";
 import { getUser } from "../../services/supabase/auth";
-import { createProfile } from "../../services/supabase/profiles";
+import { checkUsernameAvailable, createProfile } from "../../services/supabase/profiles";
 import { uploadToStorage } from "../../services/supabase/storage";
+import { useAuth } from "../../hooks/useAuth";
+import { useLoader } from "../../hooks/useLoader";
 import { useToast } from "../../hooks/useToast";
-import { joinList } from "../../utils/validation";
+import { USERNAME_RE, joinList } from "../../utils/validation";
 
 export default function ProfileSetup({
   initialProfileData,
@@ -15,10 +18,13 @@ export default function ProfileSetup({
   onComplete,
 }) {
   const initial = initialProfileData || {};
+  const isResume = !!resumeAccount;
 
-  const [avatarPreview, setAvatarPreview] = useState(
-    initial.avatarPreview || ""
+  const [username, setUsername] = useState(
+    resumeAccount?.username || initial.username || ""
   );
+  const [usernameTaken, setUsernameTaken] = useState(false);
+  const [avatarPreview, setAvatarPreview] = useState(initial.avatarPreview || "");
   const [avatarFile, setAvatarFile] = useState(initial.avatarFile || null);
   const [name, setName] = useState(initial.name || "");
   const [faculty, setFaculty] = useState(initial.faculty || "");
@@ -27,6 +33,8 @@ export default function ProfileSetup({
   const [submitting, setSubmitting] = useState(false);
 
   const fileInputRef = useRef(null);
+  const { logout } = useAuth();
+  const { runWithLoader } = useLoader();
   const { showToast } = useToast();
 
   function handleAvatarChange(e) {
@@ -40,38 +48,26 @@ export default function ProfileSetup({
     reader.readAsDataURL(file);
   }
 
-  async function handleContinue() {
-    if (submitting) return;
-
-    const missing = [];
-
-    if (!name.trim()) missing.push("your name");
-    if (!faculty) missing.push("your faculty");
-    else if (!department) missing.push("your department");
-    if (!level) missing.push("your level");
-
-    if (missing.length > 0) {
-      showToast(`Fill in ${joinList(missing)} to continue`, "error");
-      return;
-    }
-
-    const profileData = {
-      name: name.trim(),
-      faculty,
-      department,
-      level,
-      avatarFile,
-      avatarPreview,
-    };
-
-    if (!resumeAccount) {
-      onNext(profileData);
+  async function handleResumeContinue() {
+    if (!USERNAME_RE.test(username)) {
+      showToast("Enter a valid username to continue", "error");
       return;
     }
 
     setSubmitting(true);
 
     try {
+      let available = true;
+
+      await runWithLoader("Checking username…", async () => {
+        available = await checkUsernameAvailable(username);
+      });
+
+      if (!available) {
+        setUsernameTaken(true);
+        return;
+      }
+
       const { data, error } = await getUser();
 
       if (error || !data?.user || data.user.id !== resumeAccount.id) {
@@ -87,14 +83,11 @@ export default function ProfileSetup({
 
       const profileRow = {
         id: userId,
-        username:
-          resumeAccount.username ||
-          data.user.user_metadata?.username ||
-          "",
-        name: profileData.name,
-        faculty: profileData.faculty,
-        department: profileData.department,
-        level: profileData.level,
+        username,
+        name: name.trim(),
+        faculty,
+        department,
+        level,
         avatar_url: avatarUrl || null,
       };
 
@@ -103,6 +96,12 @@ export default function ProfileSetup({
       onComplete?.(profileRow);
     } catch (err) {
       console.error("Profile resume failed:", err);
+
+      if (err?.code === "23505") {
+        setUsernameTaken(true);
+        return;
+      }
+
       showToast(
         err?.message || "Couldn't finish your profile — try again",
         "error"
@@ -112,15 +111,79 @@ export default function ProfileSetup({
     }
   }
 
-  const valid = !!(name.trim() && faculty && department && level);
+  async function handleContinue() {
+    if (submitting) return;
+
+    const missing = [];
+    if (isResume && !USERNAME_RE.test(username)) missing.push("a valid username");
+    if (!name.trim()) missing.push("your name");
+    if (!faculty) missing.push("your faculty");
+    else if (!department) missing.push("your department");
+    if (!level) missing.push("your level");
+
+    if (missing.length > 0) {
+      showToast(`Fill in ${joinList(missing)} to continue`, "error");
+      return;
+    }
+
+    if (!isResume) {
+      onNext({
+        username,
+        name: name.trim(),
+        faculty,
+        department,
+        level,
+        avatarFile,
+        avatarPreview,
+      });
+      return;
+    }
+
+    await handleResumeContinue();
+  }
+
+  async function handleLogout() {
+    if (submitting) return;
+    await logout();
+  }
+
+  const usernameValid = USERNAME_RE.test(username);
+  const valid = !!(
+    (!isResume || usernameValid) &&
+    name.trim() &&
+    faculty &&
+    department &&
+    level
+  );
 
   return (
     <div className="screen-enter">
-      <BackButton onClick={onBack} />
+      {!isResume && <BackButton onClick={onBack} />}
 
-      <div className="eyebrow">STEP 3 OF 4</div>
-      <h2 className="display">Complete your profile</h2>
-      <p className="subtitle">This is how other students will see you.</p>
+      <div className="eyebrow">{isResume ? "FINISH YOUR PROFILE" : "STEP 3 OF 4"}</div>
+      <h2 className="display">{isResume ? "Finish your profile" : "Complete your profile"}</h2>
+      <p className="subtitle">
+        {isResume
+          ? "Add the remaining details before you enter Campus Connect."
+          : "This is how other students will see you."}
+      </p>
+
+      {isResume && (
+        <UsernameField
+          value={username}
+          onChange={(value) => {
+            setUsername(value);
+            setUsernameTaken(false);
+          }}
+          hintText={
+            usernameTaken
+              ? "That username is already taken — try another"
+              : undefined
+          }
+          hintState={usernameTaken ? "taken" : usernameValid ? "ok" : "default"}
+          error={usernameTaken}
+        />
+      )}
 
       <input
         ref={fileInputRef}
@@ -180,6 +243,12 @@ export default function ProfileSetup({
       >
         Continue
       </button>
+
+      {isResume && (
+        <button type="button" className="btn btn-ghost" onClick={handleLogout} disabled={submitting}>
+          Log out / use a different account
+        </button>
+      )}
     </div>
   );
 }
