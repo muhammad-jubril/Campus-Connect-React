@@ -7,9 +7,13 @@ import { useToast } from "../hooks/useToast";
 import { updateProfile } from "../services/supabase/profiles";
 import { uploadToStorage } from "../services/supabase/storage";
 import { joinList } from "../utils/validation";
+import { checkAvatar, uploadCheckMessage } from "../utils/uploadChecks";
+import { getUploadErrorMessage } from "../utils/uploadErrors";
+import { compressImage } from "../utils/imageCompression";
 
 const MAX_NAME_LENGTH = 60;
 const MAX_BIO_LENGTH = 160;
+const MAX_AVATAR_DIMENSION = 512;
 
 export default function EditProfilePage() {
   const { currentUser, setCurrentUser } = useAuth();
@@ -26,13 +30,27 @@ export default function EditProfilePage() {
   const { runWithLoader } = useLoader();
   const { showToast } = useToast();
 
-  function handleAvatarChange(e) {
+  async function handleAvatarChange(e) {
     const file = e.target.files[0];
+    e.target.value = "";
     if (!file) return;
-    setAvatarFile(file);
-    const reader = new FileReader();
-    reader.onload = (ev) => setAvatarPreview(ev.target.result);
-    reader.readAsDataURL(file);
+
+    const result = checkAvatar(file);
+    if (!result.ok) {
+      showToast(uploadCheckMessage(result, "avatar"), "error");
+      return;
+    }
+
+    try {
+      const compressedFile = await compressImage(file, MAX_AVATAR_DIMENSION, 0.8);
+      setAvatarFile(compressedFile);
+      const reader = new FileReader();
+      reader.onload = (ev) => setAvatarPreview(ev.target.result);
+      reader.readAsDataURL(compressedFile);
+    } catch (err) {
+      console.error("Avatar image processing failed:", err);
+      showToast("That file type isn't supported", "error");
+    }
   }
 
   async function handleSave() {
@@ -50,11 +68,11 @@ export default function EditProfilePage() {
     setSubmitting(true);
     try {
       await runWithLoader("Saving changes…", async () => {
+        let avatarUrl = currentUser.avatarDataUrl || null;
+        if (avatarFile) avatarUrl = await uploadToStorage("avatars", avatarFile, currentUser.id);
         const savedName = name.trim();
         const savedBio = bio.trim();
         const bioValue = savedBio || null;
-        let avatarUrl = currentUser.avatarDataUrl || null;
-        if (avatarFile) avatarUrl = await uploadToStorage("avatars", avatarFile, currentUser.id);
         await updateProfile(currentUser.id, {
           name: savedName,
           bio: bioValue,
@@ -77,7 +95,8 @@ export default function EditProfilePage() {
       navigate(-1);
     } catch (err) {
       console.error("Profile save failed:", err);
-      showToast("Couldn't save — check your connection and try again", "error");
+      const friendlyMessage = getUploadErrorMessage(err, "avatar");
+      showToast(friendlyMessage || "Couldn't save — check your connection and try again", "error");
     } finally {
       setSubmitting(false);
     }
@@ -91,7 +110,7 @@ export default function EditProfilePage() {
         <p>This is how other students will see you.</p>
       </div>
 
-      <input ref={fileInputRef} type="file" accept="image/*" style={{ display: "none" }} onChange={handleAvatarChange} />
+      <input ref={fileInputRef} type="file" accept="image/jpeg,image/png,image/webp" style={{ display: "none" }} onChange={handleAvatarChange} />
       <div className="avatar-picker" onClick={() => fileInputRef.current?.click()}>
         {avatarPreview ? <img src={avatarPreview} alt="" /> : "Add photo"}
       </div>

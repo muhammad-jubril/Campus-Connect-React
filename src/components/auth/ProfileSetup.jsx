@@ -9,8 +9,12 @@ import { useAuth } from "../../hooks/useAuth";
 import { useLoader } from "../../hooks/useLoader";
 import { useToast } from "../../hooks/useToast";
 import { USERNAME_RE, joinList } from "../../utils/validation";
+import { checkAvatar, uploadCheckMessage } from "../../utils/uploadChecks";
+import { getUploadErrorMessage } from "../../utils/uploadErrors";
+import { compressImage } from "../../utils/imageCompression";
 
 const MAX_NAME_LENGTH = 60;
+const MAX_AVATAR_DIMENSION = 512;
 
 export default function ProfileSetup({
   initialProfileData,
@@ -39,15 +43,27 @@ export default function ProfileSetup({
   const { runWithLoader } = useLoader();
   const { showToast } = useToast();
 
-  function handleAvatarChange(e) {
+  async function handleAvatarChange(e) {
     const file = e.target.files?.[0];
+    e.target.value = "";
     if (!file) return;
 
-    setAvatarFile(file);
+    const result = checkAvatar(file);
+    if (!result.ok) {
+      showToast(uploadCheckMessage(result, "avatar"), "error");
+      return;
+    }
 
-    const reader = new FileReader();
-    reader.onload = (ev) => setAvatarPreview(ev.target.result);
-    reader.readAsDataURL(file);
+    try {
+      const compressedFile = await compressImage(file, MAX_AVATAR_DIMENSION, 0.8);
+      setAvatarFile(compressedFile);
+      const reader = new FileReader();
+      reader.onload = (ev) => setAvatarPreview(ev.target.result);
+      reader.readAsDataURL(compressedFile);
+    } catch (err) {
+      console.error("Avatar image processing failed:", err);
+      showToast("That file type isn't supported", "error");
+    }
   }
 
   async function handleResumeContinue() {
@@ -97,7 +113,8 @@ export default function ProfileSetup({
           profileRow.avatar_url = avatarUrl;
         } catch (avatarError) {
           console.error("Avatar upload failed after resume profile creation:", avatarError);
-          showToast("Couldn't upload your photo — add it later from Edit profile", "error");
+          const friendlyMessage = getUploadErrorMessage(avatarError, "avatar");
+          showToast(friendlyMessage || "Couldn't upload your photo — add it later from Edit profile", "error");
         }
       }
 
@@ -197,7 +214,7 @@ export default function ProfileSetup({
       <input
         ref={fileInputRef}
         type="file"
-        accept="image/*"
+        accept="image/jpeg,image/png,image/webp"
         style={{ display: "none" }}
         onChange={handleAvatarChange}
       />

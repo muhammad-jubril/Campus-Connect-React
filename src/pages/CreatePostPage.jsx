@@ -6,9 +6,13 @@ import { useLoader } from "../hooks/useLoader";
 import { useToast } from "../hooks/useToast";
 import { createPost } from "../services/supabase/posts";
 import { uploadToStorage } from "../services/supabase/storage";
+import { checkPostMedia, checkVideoDuration, getVideoDuration, uploadCheckMessage } from "../utils/uploadChecks";
+import { getUploadErrorMessage } from "../utils/uploadErrors";
+import { compressImage } from "../utils/imageCompression";
 
 const MAX_CHARS = 600;
 const MAX_IMAGES = 10;
+const MAX_IMAGE_DIMENSION = 1600;
 
 export default function CreatePostPage() {
   const [text, setText] = useState("");
@@ -24,22 +28,59 @@ export default function CreatePostPage() {
   const { showToast } = useToast();
 
   function handleImagesChange(e) {
-    const files = Array.from(e.target.files).slice(0, MAX_IMAGES - images.length);
-    files.forEach((file) => {
+    const selectedFiles = Array.from(e.target.files).slice(0, MAX_IMAGES - images.length);
+    const acceptedFiles = [];
+    let rejectedMessage = null;
+
+    selectedFiles.forEach((file) => {
+      const result = checkPostMedia(file);
+      if (!result.ok) {
+        rejectedMessage ||= uploadCheckMessage(result, "post");
+        return;
+      }
+      acceptedFiles.push(file);
+    });
+
+    if (rejectedMessage) showToast(rejectedMessage, "error");
+
+    acceptedFiles.forEach((file) => {
       const reader = new FileReader();
-      reader.onload = (ev) => setImages((prev) => [...prev, { file, preview: ev.target.result }]);
+      reader.onload = (ev) => setImages((prev) => {
+        if (prev.length >= MAX_IMAGES) return prev;
+        return [...prev, { file, preview: ev.target.result }];
+      });
       reader.readAsDataURL(file);
     });
+
     e.target.value = "";
   }
 
-  function handleVideoChange(e) {
+  async function handleVideoChange(e) {
     const file = e.target.files[0];
+    e.target.value = "";
     if (!file) return;
+
+    const result = checkPostMedia(file);
+    if (!result.ok) {
+      showToast(uploadCheckMessage(result, "post"), "error");
+      return;
+    }
+
+    try {
+      const duration = await getVideoDuration(file);
+      if (!checkVideoDuration(duration).ok) {
+        showToast("That video is too long (max 30 seconds)", "error");
+        return;
+      }
+    } catch (err) {
+      console.error("Video metadata check failed:", err);
+      showToast("Couldn't read that video — try another file", "error");
+      return;
+    }
+
     const reader = new FileReader();
     reader.onload = (ev) => setVideo({ file, preview: ev.target.result });
     reader.readAsDataURL(file);
-    e.target.value = "";
   }
 
   function removeImage(index) {
@@ -65,7 +106,12 @@ export default function CreatePostPage() {
           mediaUrls = [await uploadToStorage("post-media", video.file, currentUser.id)];
         } else if (images.length > 0) {
           mediaType = "image";
-          mediaUrls = await Promise.all(images.map((img) => uploadToStorage("post-media", img.file, currentUser.id)));
+          const compressedImages = await Promise.all(
+            images.map((img) => compressImage(img.file, MAX_IMAGE_DIMENSION, 0.8))
+          );
+          mediaUrls = await Promise.all(
+            compressedImages.map((file) => uploadToStorage("post-media", file, currentUser.id))
+          );
         }
 
         newPost = await createPost({
@@ -82,7 +128,8 @@ export default function CreatePostPage() {
       navigate("/feed", { replace: true });
     } catch (err) {
       console.error("Post failed:", err);
-      showToast("Couldn't post — check your connection and try again", "error");
+      const friendlyMessage = getUploadErrorMessage(err, "post");
+      showToast(friendlyMessage || "Couldn't post — check your connection and try again", "error");
     } finally {
       setSubmitting(false);
     }
@@ -128,8 +175,8 @@ export default function CreatePostPage() {
         </div>
       )}
 
-      <input ref={imageInputRef} type="file" accept="image/*" multiple style={{ display: "none" }} onChange={handleImagesChange} />
-      <input ref={videoInputRef} type="file" accept="video/*" style={{ display: "none" }} onChange={handleVideoChange} />
+      <input ref={imageInputRef} type="file" accept="image/jpeg,image/png,image/webp" multiple style={{ display: "none" }} onChange={handleImagesChange} />
+      <input ref={videoInputRef} type="file" accept="video/mp4,video/webm,video/quicktime" style={{ display: "none" }} onChange={handleVideoChange} />
 
       <div className="post-media-actions">
         <button type="button" className="media-action-btn" disabled={!!video || images.length >= MAX_IMAGES} onClick={() => imageInputRef.current?.click()}>
