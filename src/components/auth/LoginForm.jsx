@@ -39,10 +39,15 @@ export default function LoginForm() {
     setAuthErrorKind("");
 
     try {
+      let loggedIn = false;
+
       await runWithLoader("Logging you in…", async () => {
-        await login(email, password);
+        loggedIn = await login(email, password);
       });
-      showToast("Logged in");
+
+      if (loggedIn) {
+        showToast("Logged in");
+      }
     } catch (err) {
       console.error("Login failed:", err);
       const kind = AUTH_ERROR_MESSAGES[err?.message]

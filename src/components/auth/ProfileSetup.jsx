@@ -3,7 +3,7 @@ import BackButton from "../common/BackButton";
 import UsernameField from "../common/UsernameField";
 import FacultyDepartmentPicker from "../common/FacultyDepartmentPicker";
 import { getUser } from "../../services/supabase/auth";
-import { checkUsernameAvailable, createProfile } from "../../services/supabase/profiles";
+import { checkUsernameAvailable, createProfile, updateProfile } from "../../services/supabase/profiles";
 import { uploadToStorage } from "../../services/supabase/storage";
 import { useAuth } from "../../hooks/useAuth";
 import { useLoader } from "../../hooks/useLoader";
@@ -75,11 +75,6 @@ export default function ProfileSetup({
       }
 
       const userId = data.user.id;
-      let avatarUrl = "";
-
-      if (avatarFile) {
-        avatarUrl = await uploadToStorage("avatars", avatarFile, userId);
-      }
 
       const profileRow = {
         id: userId,
@@ -88,10 +83,22 @@ export default function ProfileSetup({
         faculty,
         department,
         level,
-        avatar_url: avatarUrl || null,
+        avatar_url: null,
       };
 
       await createProfile(profileRow);
+
+      if (avatarFile) {
+        try {
+          const avatarUrl = await uploadToStorage("avatars", avatarFile, userId);
+          await updateProfile(userId, { avatar_url: avatarUrl });
+          profileRow.avatar_url = avatarUrl;
+        } catch (avatarError) {
+          console.error("Avatar upload failed after resume profile creation:", avatarError);
+          showToast("Couldn't upload your photo — add it later from Edit profile", "error");
+        }
+      }
+
       showToast("Profile completed successfully!");
       onComplete?.(profileRow);
     } catch (err) {

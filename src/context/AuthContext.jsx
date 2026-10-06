@@ -3,6 +3,7 @@ import {
   signInWithPassword, signOut as supabaseSignOut, getSession, onAuthStateChange,
 } from "../services/supabase/auth";
 import { getProfile, personFromProfileRow } from "../services/supabase/profiles";
+import { classifyAuthError } from "../utils/authErrors";
 
 export const AuthContext = createContext(null);
 
@@ -52,7 +53,7 @@ export function AuthProvider({ children }) {
       setCurrentUser(null);
       setPendingAccount(null);
       setStatus(STATUS.PROFILE_ERROR);
-      return;
+      return STATUS.PROFILE_ERROR;
     } finally {
       if (timeoutId) clearTimeout(timeoutId);
     }
@@ -64,7 +65,7 @@ export function AuthProvider({ children }) {
       setCurrentUser(null);
       setPendingAccount(null);
       setStatus(STATUS.PROFILE_ERROR);
-      return;
+      return STATUS.PROFILE_ERROR;
     }
 
     if (!profile) {
@@ -77,12 +78,13 @@ export function AuthProvider({ children }) {
         username: sessionUser.user_metadata?.username || "",
       });
       setStatus(STATUS.NEEDS_PROFILE_SETUP);
-      return;
+      return STATUS.NEEDS_PROFILE_SETUP;
     }
 
     setCurrentUser(personFromProfileRow(profile));
     setPendingAccount(null);
     setStatus(STATUS.SIGNED_IN);
+    return STATUS.SIGNED_IN;
   }
 
   async function refreshAuth() {
@@ -126,8 +128,10 @@ export function AuthProvider({ children }) {
 
   async function login(email, password) {
     const { data, error } = await signInWithPassword({ email, password });
-    if (error) throw error;
-    await resolveSessionUser(data.user);
+    if (error) throw new Error(classifyAuthError(error));
+
+    const resolvedStatus = await resolveSessionUser(data.user);
+    return resolvedStatus === STATUS.SIGNED_IN;
   }
 
   async function logout() {

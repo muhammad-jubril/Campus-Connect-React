@@ -230,7 +230,7 @@ export default function EmailVerificationFinal({
         setOtpError("");
         setDigits(["", "", "", "", "", ""]);
         await refreshAuth();
-        showToast("Email verified — finish your profile.", "error");
+        showToast("Email verified — finish your profile.");
         return;
       }
 
@@ -240,6 +240,7 @@ export default function EmailVerificationFinal({
       setOtpError(msg);
       setDigits(["", "", "", "", "", ""]);
       inputRefs.current[0]?.focus();
+      return;
     } finally {
       setChecking(false);
     }
