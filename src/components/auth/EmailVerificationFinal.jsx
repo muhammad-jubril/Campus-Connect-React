@@ -7,8 +7,9 @@ import {
   resendSignupOtp,
   getUser,
 } from "../../services/supabase/auth";
-import { createProfile } from "../../services/supabase/profiles";
+import { createProfile, updateProfile } from "../../services/supabase/profiles";
 import { uploadToStorage } from "../../services/supabase/storage";
+import { useAuth } from "../../hooks/useAuth";
 import { useLoader } from "../../hooks/useLoader";
 import { useToast } from "../../hooks/useToast";
 
@@ -30,6 +31,7 @@ export default function EmailVerificationFinal({
   const [sending, setSending] = useState(false);
 
   const inputRefs = useRef([]);
+  const { refreshAuth } = useAuth();
   const { runWithLoader } = useLoader();
   const { showToast } = useToast();
 
@@ -77,10 +79,6 @@ export default function EmailVerificationFinal({
 
       const { data } = signupResult;
 
-      // Email confirmation must remain enabled. If Supabase returns a
-      // session immediately, the project is allowing unverified access.
-      // Sign that session out and stop here rather than allowing the user
-      // into Campus Connect without completing verification.
       if (data?.session) {
         await signOut();
         throw new Error(
@@ -88,8 +86,6 @@ export default function EmailVerificationFinal({
         );
       }
 
-      // Supabase can return an existing user without an error in some
-      // configurations. Do not pretend that this is a fresh signup.
       if (!data?.user) {
         throw new Error("Couldn't create your account — please try again");
       }
@@ -166,17 +162,24 @@ export default function EmailVerificationFinal({
     setOtpError("");
     setChecking(true);
 
-    try {
-      let profileRow;
+    let emailVerified = false;
+    let profileRow = null;
+    let avatarUploadFailed = false;
 
-      await runWithLoader("Finishing your account…", async () => {
+    try {
+      await runWithLoader("Verifying your email…", async () => {
         const { error: verifyError } = await verifySignupOtp({
           email,
           token: code,
         });
 
         if (verifyError) throw verifyError;
+      });
 
+      // From this point onward the OTP has been consumed successfully.
+      emailVerified = true;
+
+      try {
         const { data: userData, error: userError } = await getUser();
 
         if (userError || !userData?.user) {
@@ -187,15 +190,6 @@ export default function EmailVerificationFinal({
         }
 
         const userId = userData.user.id;
-        let avatarUrl = "";
-
-        if (profileData.avatarFile) {
-          avatarUrl = await uploadToStorage(
-            "avatars",
-            profileData.avatarFile,
-            userId
-          );
-        }
 
         profileRow = {
           id: userId,
@@ -204,20 +198,44 @@ export default function EmailVerificationFinal({
           faculty: profileData.faculty,
           department: profileData.department,
           level: profileData.level,
-          avatar_url: avatarUrl || null,
+          avatar_url: null,
         };
 
-        await createProfile(profileRow);
-      });
+        // Create the account's profile identity first. The avatar is optional
+        // and must never prevent the profile row from being created.
+        await runWithLoader("Finishing your account…", async () => {
+          await createProfile(profileRow);
+        });
 
-      showToast("Account created successfully!");
-      onComplete(profileRow);
+        if (profileData.avatarFile) {
+          try {
+            const avatarUrl = await uploadToStorage(
+              "avatars",
+              profileData.avatarFile,
+              userId
+            );
+            await updateProfile(userId, { avatar_url: avatarUrl });
+            profileRow = { ...profileRow, avatar_url: avatarUrl };
+          } catch (avatarError) {
+            avatarUploadFailed = true;
+            console.error("Avatar upload failed after profile creation:", avatarError);
+          }
+        }
+      } catch (profileError) {
+        console.error("Profile creation failed after email verification:", profileError);
+        throw profileError;
+      }
     } catch (err) {
+      if (emailVerified) {
+        setOtpError("");
+        setDigits(["", "", "", "", "", ""]);
+        await refreshAuth();
+        showToast("Email verified — finish your profile.", "error");
+        return;
+      }
+
       const msg =
-        err?.message?.includes("duplicate") ||
-        err?.code === "23505"
-          ? "That username was just taken — go back and pick another"
-          : err?.message || "Couldn't verify — check the code and try again";
+        err?.message || "Couldn't verify — check the code and try again";
 
       setOtpError(msg);
       setDigits(["", "", "", "", "", ""]);
@@ -225,6 +243,14 @@ export default function EmailVerificationFinal({
     } finally {
       setChecking(false);
     }
+
+    showToast(
+      avatarUploadFailed
+        ? "Couldn't upload your photo — add it later from Edit profile"
+        : "Account created successfully!",
+      avatarUploadFailed ? "error" : ""
+    );
+    onComplete(profileRow);
   }
 
   async function handleResend() {
@@ -266,7 +292,7 @@ export default function EmailVerificationFinal({
             className="subtitle"
             style={{ marginTop: -16, marginBottom: 24 }}
           >
-            A verification code will be sent to{" "}
+            A verification code will be sent to {""}
             <strong>{email}</strong>
           </p>
 
