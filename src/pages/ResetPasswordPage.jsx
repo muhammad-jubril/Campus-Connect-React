@@ -1,13 +1,23 @@
+import { useEffect, useState } from "react";
 import AuthLayout from "../components/auth/AuthLayout";
-import ResetPassword from "../components/auth/ResetPassword";
+import ResetLinkExpired from "../components/auth/ResetLinkExpired";
+import { cleanAuthUrlErrorHash, readAuthUrlError } from "../utils/authUrlErrors";
 
-// Only reachable directly if someone navigates here manually — the normal
-// path is AppRoutes rendering <ResetPassword/> automatically the instant
-// AuthContext detects the PASSWORD_RECOVERY event, regardless of URL.
+// AppRoutes owns the real reset form when Supabase emits PASSWORD_RECOVERY.
+// This route is only reached without a recovery session, so it is the safe
+// landing screen for direct visits and expired/used links.
 export default function ResetPasswordPage() {
+  const [urlError, setUrlError] = useState(null);
+
+  useEffect(() => {
+    const nextError = readAuthUrlError();
+    if (nextError) setUrlError(nextError);
+    cleanAuthUrlErrorHash();
+  }, []);
+
   return (
     <AuthLayout>
-      <ResetPassword />
+      <ResetLinkExpired detail={urlError?.message} />
     </AuthLayout>
   );
 }

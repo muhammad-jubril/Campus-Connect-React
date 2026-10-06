@@ -36,13 +36,14 @@ export function onAuthStateChange(callback) {
   return supabase.auth.onAuthStateChange((event, session) => callback(event, session));
 }
 
-// The reset-password email's link has to point somewhere reachable later.
-// If requested from a local dev server, fall back to the real deployed
-// site — a localhost link is useless to anyone but the machine that sent it.
-const PRODUCTION_URL = "https://campus-connect-224y.vercel.app/";
+// Password-reset links must point at the deployed application's reset route.
+// VITE_SITE_URL is set independently per environment; the fallback keeps the
+// current production deployment working until the variable is configured.
+const DEFAULT_SITE_URL = "https://campus-connect-224y.vercel.app";
+
 export function getResetRedirectUrl() {
-  const isLocal = /^(localhost|127\.0\.0\.1)$/.test(window.location.hostname);
-  return isLocal ? PRODUCTION_URL : window.location.origin + "/reset-password";
+  const configuredSiteUrl = (import.meta.env.VITE_SITE_URL || DEFAULT_SITE_URL).trim().replace(/\/+$/, "");
+  return `${configuredSiteUrl}/reset-password`;
 }
 
 export function resetPasswordForEmail(email) {
