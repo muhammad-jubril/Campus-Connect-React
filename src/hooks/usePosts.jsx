@@ -13,6 +13,7 @@ export function PostsProvider({ children }) {
   const [posts, setPosts] = useState([]);
   const [activeCommentsPostId, setActiveCommentsPostId] = useState(null);
   const loadedRef = useRef(false);
+  const commentsTriggerRef = useRef(null);
   const { currentUser } = useAuth();
   const { warmPeople } = usePeople();
   const { showToast } = useToast();
@@ -27,6 +28,13 @@ export function PostsProvider({ children }) {
 
   const addPost = useCallback((post) => {
     setPosts((prev) => [post, ...prev]);
+  }, []);
+
+  const updatePostText = useCallback(async (postId, text) => {
+    await postsApi.updatePostText(postId, text);
+    setPosts((prev) => prev.map((p) => (
+      p.id === postId ? { ...p, text, editedAt: Date.now() } : p
+    )));
   }, []);
 
   const removePost = useCallback(async (postId) => {
@@ -54,15 +62,32 @@ export function PostsProvider({ children }) {
   }, [posts, currentUser, showToast]);
 
   const bumpCommentCount = useCallback((postId, delta) => {
-    setPosts((prev) => prev.map((p) => p.id === postId ? { ...p, commentCount: p.commentCount + delta } : p));
+    setPosts((prev) => prev.map((p) => p.id === postId ? {
+      ...p,
+      commentCount: Math.max(0, (p.commentCount || 0) + delta),
+    } : p));
+  }, []);
+
+  const openComments = useCallback((postId, trigger = null) => {
+    commentsTriggerRef.current = trigger;
+    setActiveCommentsPostId(postId);
+  }, []);
+
+  const closeComments = useCallback(() => {
+    const trigger = commentsTriggerRef.current;
+    commentsTriggerRef.current = null;
+    setActiveCommentsPostId(null);
+    if (trigger && trigger.isConnected) {
+      window.setTimeout(() => trigger.focus(), 0);
+    }
   }, []);
 
   return (
     <PostsContext.Provider value={{
-      posts, loadPosts, addPost, removePost, toggleLike, bumpCommentCount,
+      posts, loadPosts, addPost, updatePostText, removePost, toggleLike, bumpCommentCount,
       activePost: posts.find((p) => p.id === activeCommentsPostId) || null,
-      openComments: setActiveCommentsPostId,
-      closeComments: () => setActiveCommentsPostId(null),
+      openComments,
+      closeComments,
     }}>
       {children}
     </PostsContext.Provider>

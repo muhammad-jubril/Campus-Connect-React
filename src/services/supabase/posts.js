@@ -13,6 +13,7 @@ function postRowToPost(row) {
       dataUrl: row.media_type === "video" ? (row.media_urls || [])[0] : undefined,
     },
     createdAt: new Date(row.created_at).getTime(),
+    editedAt: row.edited_at ? new Date(row.edited_at).getTime() : null,
     likes: row.like_count || 0,
     liked: !!row.liked_by_me,
     commentCount: row.comment_count || 0,
@@ -22,7 +23,7 @@ function postRowToPost(row) {
 export async function fetchPosts(currentUserId) {
   const { data: postRows, error } = await supabase
     .from("posts")
-    .select("id, author_id, text, media_type, media_urls, created_at, profiles!posts_author_id_fkey(username)")
+    .select("id, author_id, text, media_type, media_urls, created_at, edited_at, profiles!posts_author_id_fkey(username)")
     .order("created_at", { ascending: false });
   if (error || !postRows) { console.warn("fetchPosts failed:", error); return []; }
 
@@ -66,6 +67,14 @@ export async function createPost({ authorId, authorUsername, text, mediaType, me
     liked_by_me: false,
     comment_count: 0,
   });
+}
+
+export async function updatePostText(postId, text) {
+  const { error } = await supabase
+    .from("posts")
+    .update({ text })
+    .eq("id", postId);
+  if (error) throw error;
 }
 
 export async function deletePost(postId) {

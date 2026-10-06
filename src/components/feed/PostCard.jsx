@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Avatar from "../common/Avatar";
+import EditPostForm from "./EditPostForm";
+import PostMenu from "./PostMenu";
 import { usePeople } from "../../hooks/usePeople";
 import { useAuth } from "../../hooks/useAuth";
 import { usePosts } from "../../hooks/usePosts";
@@ -42,9 +44,10 @@ export default function PostCard({ post }) {
   const { toggleLike, openComments } = usePosts();
   const navigate = useNavigate();
   const [justLiked, setJustLiked] = useState(false);
+  const [editing, setEditing] = useState(false);
 
   const author = getPerson(post.authorUsername);
-  const isSelf = currentUser && post.authorUsername === currentUser.username;
+  const isSelf = currentUser && post.authorId === currentUser.id;
 
   function handleLike() {
     if (!post.liked) {
@@ -62,9 +65,27 @@ export default function PostCard({ post }) {
           <div className="post-card-author">{author.name}{isSelf ? " (You)" : ""}</div>
           <div className="post-card-sub">{author.department || ""}{author.level ? ` · ${author.level} Level` : ""}</div>
         </div>
-        <div className="post-card-time">{timeAgo(post.createdAt)}</div>
+        <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 4, flexShrink: 0 }}>
+          <div className="post-card-time" style={{ marginLeft: 0 }}>
+            {timeAgo(post.createdAt)}
+            {post.editedAt && (
+              <span style={{ marginLeft: 6, textTransform: "none" }}>(edited)</span>
+            )}
+          </div>
+          {isSelf && <PostMenu post={post} onEdit={() => setEditing(true)} />}
+        </div>
       </div>
-      <div className="post-card-text">{post.text}</div>
+
+      {editing ? (
+        <EditPostForm
+          post={post}
+          onCancel={() => setEditing(false)}
+          onSaved={() => setEditing(false)}
+        />
+      ) : (
+        <div className="post-card-text">{post.text}</div>
+      )}
+
       <MediaBlock media={post.media} />
       <div className="post-card-actions">
         <button type="button" className={`post-action-btn like-btn ${post.liked ? "liked" : ""} ${justLiked ? "stamp" : ""}`} onClick={handleLike}>
@@ -78,7 +99,7 @@ export default function PostCard({ post }) {
             </span>
           )}
         </button>
-        <button type="button" className="post-action-btn comment-btn" onClick={() => openComments(post.id)}>
+        <button type="button" className="post-action-btn comment-btn" onClick={(event) => openComments(post.id, event.currentTarget)}>
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" /></svg>
           <span className="comment-count">{post.commentCount}</span>
         </button>
