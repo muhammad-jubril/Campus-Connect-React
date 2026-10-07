@@ -4,11 +4,21 @@ import { checkPasswordRules } from "../../utils/validation";
 // Reusable password input: show/hide toggle + the live requirements
 // checklist. Used on Signup Step 1 and Reset Password — identical rules
 // in both places (ported from checkPasswordRules in the vanilla build).
-export default function PasswordField({ label, value, onChange, placeholder, showRequirements = true, error, id }) {
+export default function PasswordField({
+  label,
+  value,
+  onChange,
+  placeholder,
+  showRequirements = true,
+  error,
+  id,
+  autoComplete = "new-password",
+}) {
   const [visible, setVisible] = useState(false);
   const autoId = useId();
   const fieldId = id || autoId;
   const rules = checkPasswordRules(value);
+  const errorId = error ? `${fieldId}-error` : undefined;
 
   return (
     <div className={`field ${error ? "has-error" : ""}`}>
@@ -20,7 +30,9 @@ export default function PasswordField({ label, value, onChange, placeholder, sho
           value={value}
           onChange={(e) => onChange(e.target.value)}
           placeholder={placeholder}
-          autoComplete="new-password"
+          autoComplete={autoComplete}
+          aria-invalid={!!error}
+          aria-describedby={errorId}
         />
         <button
           type="button"
@@ -33,7 +45,7 @@ export default function PasswordField({ label, value, onChange, placeholder, sho
           </svg>
         </button>
       </div>
-      {error && <div className="error">{error}</div>}
+      {error && <div id={errorId} className="error">{error}</div>}
       {showRequirements && (
         <ul className="pw-requirements">
           <li className={rules.length ? "met" : ""}><span className="rule-dot" />At least 8 characters</li>

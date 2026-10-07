@@ -11,7 +11,6 @@ export default function FacultyDepartmentPicker({ faculty, department, onChange 
   const [modalFaculty, setModalFaculty] = useState(null); // non-null = modal open, listing this faculty's departments
   const [deptQuery, setDeptQuery] = useState("");
   const blurTimeout = useRef(null);
-
   const matches = Object.keys(FACULTIES).filter((f) => f.toLowerCase().includes(query.trim().toLowerCase()));
 
   function selectFaculty(facultyName) {
@@ -32,8 +31,9 @@ export default function FacultyDepartmentPicker({ faculty, department, onChange 
   return (
     <>
       <div className="field autocomplete-field">
-        <label>Faculty</label>
+        <label htmlFor="profile-faculty">Faculty</label>
         <input
+          id="profile-faculty"
           type="text"
           value={query}
           onChange={(e) => {
@@ -45,6 +45,7 @@ export default function FacultyDepartmentPicker({ faculty, department, onChange 
           onFocus={() => setShowSuggestions(true)}
           onBlur={() => { blurTimeout.current = setTimeout(() => setShowSuggestions(false), 150); }}
           placeholder="Start typing your faculty"
+          autoComplete="organization"
         />
         <div className={`suggestions ${showSuggestions && query.trim() ? "show" : ""}`}>
           {matches.length === 0
@@ -57,9 +58,9 @@ export default function FacultyDepartmentPicker({ faculty, department, onChange 
 
       {department && (
         <div className="field">
-          <label>Department</label>
+          <label htmlFor="profile-department">Department</label>
           <div className="dept-chip-wrap">
-            <input type="text" value={department} readOnly />
+            <input id="profile-department" type="text" value={department} readOnly />
             <button type="button" className="dept-change-btn" onClick={() => { setModalFaculty(faculty); setDeptQuery(""); }}>Change</button>
           </div>
         </div>
@@ -69,7 +70,8 @@ export default function FacultyDepartmentPicker({ faculty, department, onChange 
         <div className="modal-card" onClick={(e) => e.stopPropagation()}>
           <h2 className="display" style={{ fontSize: 19 }}>Select department</h2>
           <p className="modal-sub">{modalFaculty}</p>
-          <input type="text" placeholder="Search departments" value={deptQuery} onChange={(e) => setDeptQuery(e.target.value)} autoFocus />
+          <label htmlFor="department-search" style={{ position: "absolute", width: 1, height: 1, padding: 0, margin: -1, overflow: "hidden", clip: "rect(0, 0, 0, 0)", whiteSpace: "nowrap", border: 0 }}>Search departments</label>
+          <input id="department-search" type="text" placeholder="Search departments" value={deptQuery} onChange={(e) => setDeptQuery(e.target.value)} autoFocus />
           <div className="modal-list">
             {filteredDepts.length === 0
               ? <div className="suggestion-empty">No matching department</div>

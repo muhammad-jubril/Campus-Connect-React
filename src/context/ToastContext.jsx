@@ -12,10 +12,19 @@ export function ToastProvider({ children }) {
     timerRef.current = setTimeout(() => setToast((t) => ({ ...t, show: false })), 3200);
   }, []);
 
+  const isError = toast.type === "error";
+
   return (
     <ToastContext.Provider value={{ showToast }}>
       {children}
-      <div className={`toast ${toast.type} ${toast.show ? "show" : ""}`}>{toast.text}</div>
+      <div
+        className={`toast ${toast.type} ${toast.show ? "show" : ""}`}
+        role={isError ? "alert" : "status"}
+        aria-live={isError ? "assertive" : "polite"}
+        aria-atomic="true"
+      >
+        {toast.text}
+      </div>
     </ToastContext.Provider>
   );
 }

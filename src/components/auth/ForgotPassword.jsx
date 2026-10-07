@@ -23,13 +23,15 @@ export default function ForgotPassword() {
   const { runWithLoader } = useLoader();
   const { showToast } = useToast();
 
-  async function handleSend() {
+  async function handleSend(event) {
+    event.preventDefault();
     if (isCoolingDown) {
       showToast(`Please wait ${remaining}s before requesting another link`, "error");
       return;
     }
 
-    if (!EMAIL_RE.test(email)) {
+    const normalizedEmail = email.trim();
+    if (!EMAIL_RE.test(normalizedEmail)) {
       setError(true);
       showToast("Enter a valid email", "error");
       return;
@@ -41,7 +43,7 @@ export default function ForgotPassword() {
 
     try {
       await runWithLoader("Sending reset link…", async () => {
-        result = await resetPasswordForEmail(email);
+        result = await resetPasswordForEmail(normalizedEmail);
       });
     } catch (err) {
       const kind = classifyAuthError(err);
@@ -90,14 +92,15 @@ export default function ForgotPassword() {
   }
 
   return (
-    <div className="screen-enter">
+    <form className="screen-enter" onSubmit={handleSend} noValidate>
       <BackButton onClick={() => navigate("/login")} />
       <h2 className="display">Reset your password</h2>
       <p className="subtitle">Enter your email and we'll send you a reset link.</p>
 
       <div className={`field ${error ? "has-error" : ""}`}>
-        <label>Email</label>
+        <label htmlFor="forgot-email">Email</label>
         <input
+          id="forgot-email"
           type="email"
           value={email}
           onChange={(e) => {
@@ -106,18 +109,21 @@ export default function ForgotPassword() {
           }}
           placeholder="you@example.com"
           autoComplete="email"
+          inputMode="email"
+          autoCapitalize="none"
+          autoCorrect="off"
+          spellCheck={false}
         />
       </div>
 
       <div className="spacer" />
       <button
-        type="button"
+        type="submit"
         className="btn btn-primary"
-        onClick={handleSend}
         disabled={isCoolingDown}
       >
         {isCoolingDown ? `Send reset link (${remaining}s)` : "Send reset link"}
       </button>
-    </div>
+    </form>
   );
 }

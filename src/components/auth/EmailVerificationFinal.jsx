@@ -275,8 +275,24 @@ export default function EmailVerificationFinal({
     setCooldown(30);
   }
 
+  async function handleSubmit(event) {
+    event.preventDefault();
+    if (!showOtp) {
+      await handleSendCode();
+      return;
+    }
+
+    const code = digits.join("");
+    if (code.length === 6) {
+      await verifyCode(code);
+      return;
+    }
+
+    showToast("Enter the 6-digit code", "error");
+  }
+
   return (
-    <div className="screen-enter">
+    <form className="screen-enter" onSubmit={handleSubmit} noValidate>
       <BackButton
         onClick={() => (showOtp ? setShowOtp(false) : onBack())}
       />
@@ -300,9 +316,8 @@ export default function EmailVerificationFinal({
           <div className="spacer" />
 
           <button
-            type="button"
+            type="submit"
             className="btn btn-primary"
-            onClick={handleSendCode}
             disabled={sending}
           >
             Send code to {email}
@@ -313,20 +328,26 @@ export default function EmailVerificationFinal({
           <p className="subtitle" style={{ marginTop: -16 }}>
             Enter the 6-digit code we sent to {email}.
           </p>
+          <p className="hint" style={{ marginTop: -14, marginBottom: 16 }}>
+            Didn't get it? Check your spam folder.
+          </p>
 
           <div className="field">
-            <label>Enter the 6-digit code</label>
+            <label htmlFor="signup-otp-1">Enter the 6-digit code</label>
 
             <div className={`otp-row ${checking ? "checking" : ""}`}>
               {digits.map((d, i) => (
                 <input
                   key={i}
+                  id={`signup-otp-${i + 1}`}
                   ref={(el) => (inputRefs.current[i] = el)}
                   maxLength={1}
                   inputMode="numeric"
+                  autoComplete={i === 0 ? "one-time-code" : "off"}
                   className="otp-digit"
                   value={d}
                   disabled={checking}
+                  aria-label={`Verification code digit ${i + 1}`}
                   onChange={(e) => updateDigit(i, e.target.value)}
                   onKeyDown={(e) => handleKeyDown(i, e)}
                   onPaste={handlePaste}
@@ -335,7 +356,7 @@ export default function EmailVerificationFinal({
             </div>
 
             {otpError && (
-              <div className="error" style={{ display: "block" }}>
+              <div className="error" style={{ display: "block" }} role="alert">
                 {otpError}
               </div>
             )}
@@ -353,6 +374,6 @@ export default function EmailVerificationFinal({
           <div className="spacer" />
         </>
       )}
-    </div>
+    </form>
   );
 }

@@ -137,7 +137,8 @@ export default function ProfileSetup({
     }
   }
 
-  async function handleContinue() {
+  async function handleContinue(event) {
+    event.preventDefault();
     if (submitting) return;
 
     const missing = [];
@@ -183,7 +184,7 @@ export default function ProfileSetup({
   );
 
   return (
-    <div className="screen-enter">
+    <form className="screen-enter" onSubmit={handleContinue}>
       {!isResume && <BackButton onClick={onBack} />}
 
       <div className="eyebrow">{isResume ? "FINISH YOUR PROFILE" : "STEP 3 OF 4"}</div>
@@ -212,28 +213,42 @@ export default function ProfileSetup({
       )}
 
       <input
+        id="profile-avatar"
         ref={fileInputRef}
         type="file"
         accept="image/jpeg,image/png,image/webp"
         style={{ display: "none" }}
         onChange={handleAvatarChange}
+        aria-label="Profile photo"
       />
 
       <div
         className="avatar-picker"
+        role="button"
+        tabIndex={0}
         onClick={() => fileInputRef.current?.click()}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            fileInputRef.current?.click();
+          }
+        }}
+        aria-controls="profile-avatar"
+        aria-label={avatarPreview ? "Change profile photo" : "Add profile photo"}
       >
         {avatarPreview ? <img src={avatarPreview} alt="" /> : "Add photo"}
       </div>
 
       <div className="field">
-        <label>Full name</label>
+        <label htmlFor="profile-name">Full name</label>
         <input
+          id="profile-name"
           type="text"
           value={name}
           maxLength={MAX_NAME_LENGTH}
           onChange={(e) => setName(e.target.value)}
           placeholder="Your name"
+          autoComplete="name"
         />
       </div>
 
@@ -247,9 +262,9 @@ export default function ProfileSetup({
       />
 
       <div className="field">
-        <label>Level</label>
+        <label htmlFor="profile-level">Level</label>
         <div className="select-wrap-full">
-          <select value={level} onChange={(e) => setLevel(e.target.value)}>
+          <select id="profile-level" value={level} onChange={(e) => setLevel(e.target.value)}>
             <option value="">Select level</option>
             <option>100</option>
             <option>200</option>
@@ -263,9 +278,8 @@ export default function ProfileSetup({
       <div className="spacer" />
 
       <button
-        type="button"
+        type="submit"
         className={`btn btn-primary ${!valid ? "is-invalid" : ""}`}
-        onClick={handleContinue}
         disabled={submitting}
       >
         Continue
@@ -276,6 +290,6 @@ export default function ProfileSetup({
           Log out / use a different account
         </button>
       )}
-    </div>
+    </form>
   );
 }

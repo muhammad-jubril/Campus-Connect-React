@@ -22,7 +22,8 @@ export default function SignupForm({ initialUsername, initialPassword, onNext, o
   const passwordValid = isPasswordValid(password);
   const confirmValid = confirmPassword.length > 0 && confirmPassword === password;
 
-  async function handleContinue() {
+  async function handleContinue(event) {
+    event.preventDefault();
     if (submitting) return;
 
     const missing = [];
@@ -65,7 +66,7 @@ export default function SignupForm({ initialUsername, initialPassword, onNext, o
   }
 
   return (
-    <div className="screen-enter">
+    <form className="screen-enter" onSubmit={handleContinue}>
       <BackButton onClick={onBack} />
 
       <div className="eyebrow">STEP 1 OF 4</div>
@@ -90,15 +91,18 @@ export default function SignupForm({ initialUsername, initialPassword, onNext, o
       />
 
       <PasswordField
+        id="signup-password"
         label="Password"
         value={password}
         onChange={setPassword}
         placeholder="Create a password"
+        autoComplete="new-password"
       />
 
       <div className={`field ${confirmError && !confirmValid ? "has-error" : ""}`}>
-        <label>Confirm password</label>
+        <label htmlFor="signup-confirm-password">Confirm password</label>
         <input
+          id="signup-confirm-password"
           type="password"
           value={confirmPassword}
           onChange={(e) => {
@@ -106,6 +110,8 @@ export default function SignupForm({ initialUsername, initialPassword, onNext, o
             setConfirmError(false);
           }}
           placeholder="Re-enter your password"
+          autoComplete="new-password"
+          aria-invalid={confirmError && !confirmValid}
         />
         <div className="error">Passwords don't match</div>
       </div>
@@ -113,11 +119,11 @@ export default function SignupForm({ initialUsername, initialPassword, onNext, o
       <div className="spacer" />
 
       <button
-        type="button"
+        type="submit"
         className={`btn btn-primary ${
           !(usernameValid && passwordValid && confirmValid) ? "is-invalid" : ""
         }`}
-        onClick={handleContinue}
+        disabled={submitting}
       >
         Continue
       </button>
@@ -125,6 +131,6 @@ export default function SignupForm({ initialUsername, initialPassword, onNext, o
       <p className="link-row">
         Already have an account? <Link to="/login">Log in instead</Link>
       </p>
-    </div>
+    </form>
   );
 }

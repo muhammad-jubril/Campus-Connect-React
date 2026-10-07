@@ -12,18 +12,21 @@ export default function EmailVerification({
   const [emailError, setEmailError] = useState(false);
   const { showToast } = useToast();
 
-  function handleContinue() {
-    if (!EMAIL_RE.test(email)) {
+  function handleContinue(event) {
+    event.preventDefault();
+    const normalizedEmail = email.trim();
+
+    if (!EMAIL_RE.test(normalizedEmail)) {
       setEmailError(true);
       showToast("Enter a valid email address", "error");
       return;
     }
 
-    onNext(email);
+    onNext(normalizedEmail);
   }
 
   return (
-    <div className="screen-enter">
+    <form className="screen-enter" onSubmit={handleContinue} noValidate>
       <BackButton onClick={onBack} />
 
       <div className="eyebrow">STEP 2 OF 4</div>
@@ -33,8 +36,9 @@ export default function EmailVerification({
       </p>
 
       <div className={`field ${emailError ? "has-error" : ""}`}>
-        <label>Email address</label>
+        <label htmlFor="signup-email">Email address</label>
         <input
+          id="signup-email"
           type="email"
           value={email}
           onChange={(e) => {
@@ -43,6 +47,11 @@ export default function EmailVerification({
           }}
           placeholder="you@example.com"
           autoComplete="email"
+          inputMode="email"
+          autoCapitalize="none"
+          autoCorrect="off"
+          spellCheck={false}
+          aria-invalid={emailError}
         />
         <div className="error">Enter a valid email address</div>
       </div>
@@ -50,14 +59,11 @@ export default function EmailVerification({
       <div className="spacer" />
 
       <button
-        type="button"
-        className={`btn btn-primary ${
-          !EMAIL_RE.test(email) ? "is-invalid" : ""
-        }`}
-        onClick={handleContinue}
+        type="submit"
+        className={`btn btn-primary ${!EMAIL_RE.test(email.trim()) ? "is-invalid" : ""}`}
       >
         Continue
       </button>
-    </div>
+    </form>
   );
 }

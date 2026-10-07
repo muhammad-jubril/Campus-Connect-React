@@ -21,7 +21,8 @@ export default function ResetPassword() {
   const passwordValid = isPasswordValid(password);
   const confirmValid = confirm.length > 0 && confirm === password;
 
-  async function handleSubmit() {
+  async function handleSubmit(event) {
+    event.preventDefault();
     if (submitting) return;
     if (!passwordValid || !confirmValid) {
       if (!confirmValid) setConfirmError(true);
@@ -51,21 +52,36 @@ export default function ResetPassword() {
   }
 
   return (
-    <div className="screen-enter">
+    <form className="screen-enter" onSubmit={handleSubmit}>
       <h2 className="display">Choose a new password</h2>
       <p className="subtitle">This resets the password for your account.</p>
 
-      <PasswordField label="New password" value={password} onChange={setPassword} placeholder="Create a new password" />
+      <PasswordField
+        id="reset-password"
+        label="New password"
+        value={password}
+        onChange={setPassword}
+        placeholder="Create a new password"
+        autoComplete="new-password"
+      />
       <div className={`field ${confirmError && !confirmValid ? "has-error" : ""}`}>
-        <label>Confirm new password</label>
-        <input type="password" value={confirm} onChange={(e) => { setConfirm(e.target.value); setConfirmError(false); }} placeholder="Re-enter your new password" />
+        <label htmlFor="reset-confirm-password">Confirm new password</label>
+        <input
+          id="reset-confirm-password"
+          type="password"
+          value={confirm}
+          onChange={(e) => { setConfirm(e.target.value); setConfirmError(false); }}
+          placeholder="Re-enter your new password"
+          autoComplete="new-password"
+          aria-invalid={confirmError && !confirmValid}
+        />
         <div className="error">Passwords don't match</div>
       </div>
 
       <div className="spacer" />
-      <button type="button" className={`btn btn-primary ${!(passwordValid && confirmValid) ? "is-invalid" : ""}`} onClick={handleSubmit}>
+      <button type="submit" className={`btn btn-primary ${!(passwordValid && confirmValid) ? "is-invalid" : ""}`} disabled={submitting}>
         Set new password
       </button>
-    </div>
+    </form>
   );
 }

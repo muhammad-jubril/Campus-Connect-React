@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
+import PasswordField from "../common/PasswordField";
 import { useAuth } from "../../hooks/useAuth";
 import { useLoader } from "../../hooks/useLoader";
 import { useToast } from "../../hooks/useToast";
@@ -22,11 +23,13 @@ export default function LoginForm() {
   const { runWithLoader } = useLoader();
   const { showToast } = useToast();
 
-  async function handleLogin() {
+  async function handleLogin(event) {
+    event.preventDefault();
     if (submitting) return;
 
+    const normalizedEmail = email.trim();
     const missing = [];
-    if (!EMAIL_RE.test(email)) missing.push("your email");
+    if (!EMAIL_RE.test(normalizedEmail)) missing.push("your email");
     if (!password) missing.push("your password");
 
     if (missing.length > 0) {
@@ -42,7 +45,7 @@ export default function LoginForm() {
       let loggedIn = false;
 
       await runWithLoader("Logging you in…", async () => {
-        loggedIn = await login(email, password);
+        loggedIn = await login(normalizedEmail, password);
       });
 
       if (loggedIn) {
@@ -64,13 +67,14 @@ export default function LoginForm() {
   const showUnverifiedMessage = authErrorKind === "email-not-confirmed";
 
   return (
-    <div className="screen-enter">
+    <form className="screen-enter" onSubmit={handleLogin} noValidate>
       <h2 className="display">Welcome back</h2>
       <p className="subtitle">Log in with your email.</p>
 
       <div className={`field ${showEmailError ? "has-error" : ""}`}>
-        <label>Email</label>
+        <label htmlFor="login-email">Email</label>
         <input
+          id="login-email"
           type="email"
           value={email}
           onChange={(e) => {
@@ -79,21 +83,25 @@ export default function LoginForm() {
           }}
           placeholder="you@example.com"
           autoComplete="email"
+          inputMode="email"
+          autoCapitalize="none"
+          autoCorrect="off"
+          spellCheck={false}
         />
       </div>
 
-      <div className="field">
-        <label>Password</label>
-        <input
-          type="password"
-          value={password}
-          onChange={(e) => {
-            setPassword(e.target.value);
-            setAuthErrorKind("");
-          }}
-          placeholder="Your password"
-        />
-      </div>
+      <PasswordField
+        id="login-password"
+        label="Password"
+        value={password}
+        onChange={(value) => {
+          setPassword(value);
+          setAuthErrorKind("");
+        }}
+        placeholder="Your password"
+        autoComplete="current-password"
+        showRequirements={false}
+      />
 
       {showUnverifiedMessage && (
         <p
@@ -119,10 +127,10 @@ export default function LoginForm() {
       </p>
 
       <div className="spacer" />
-      <button type="button" className="btn btn-primary" onClick={handleLogin} disabled={submitting}>
+      <button type="submit" className="btn btn-primary" disabled={submitting}>
         Log in
       </button>
       <p className="link-row">New here? <Link to="/signup">Create an account</Link></p>
-    </div>
+    </form>
   );
 }
