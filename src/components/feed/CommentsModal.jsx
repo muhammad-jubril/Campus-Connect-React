@@ -10,6 +10,10 @@ import { timeAgo } from "../../utils/timeAgo";
 
 const MAX_COMMENT_LENGTH = 500;
 
+const getFocusableElements = (container) => Array.from(container.querySelectorAll(
+  'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+)).filter((element) => element.getAttribute("aria-hidden") !== "true");
+
 export default function CommentsModal() {
   const [comments, setComments] = useState(null); // null = loading
   const [text, setText] = useState("");
@@ -17,6 +21,7 @@ export default function CommentsModal() {
   const [pendingDelete, setPendingDelete] = useState(null);
   const [deleting, setDeleting] = useState(false);
   const inputRef = useRef(null);
+  const dialogRef = useRef(null);
   const deleteTriggerRef = useRef(null);
   const { getPerson, warmPeople } = usePeople();
   const { activePost: post, closeComments: onClose, bumpCommentCount } = usePosts();
@@ -24,7 +29,7 @@ export default function CommentsModal() {
   const { showToast } = useToast();
 
   useEffect(() => {
-    if (!post) return;
+    if (!post) return undefined;
     let cancelled = false;
     setComments(null);
     setPendingDelete(null);
@@ -33,18 +38,43 @@ export default function CommentsModal() {
       setComments(rows);
       warmPeople(rows.map((c) => c.authorUsername));
     });
-    setTimeout(() => inputRef.current?.focus(), 250);
-    return () => { cancelled = true; };
+    const focusTimer = window.requestAnimationFrame(() => inputRef.current?.focus());
+    return () => {
+      cancelled = true;
+      window.cancelAnimationFrame(focusTimer);
+    };
   }, [post, warmPeople]);
 
   useEffect(() => {
-    if (!post) return undefined;
+    if (!post || pendingDelete) return undefined;
     const handleKeyDown = (event) => {
-      if (event.key === "Escape" && !pendingDelete && !sending) {
+      if (event.key === "Escape" && !sending) {
         event.preventDefault();
         onClose();
+        return;
+      }
+
+      if (event.key !== "Tab" || !dialogRef.current) return;
+      const focusables = getFocusableElements(dialogRef.current);
+
+      if (focusables.length === 0) {
+        event.preventDefault();
+        dialogRef.current.focus();
+        return;
+      }
+
+      const first = focusables[0];
+      const last = focusables[focusables.length - 1];
+
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
       }
     };
+
     document.addEventListener("keydown", handleKeyDown);
     return () => document.removeEventListener("keydown", handleKeyDown);
   }, [post, pendingDelete, sending, onClose]);
@@ -107,10 +137,12 @@ export default function CommentsModal() {
   return (
     <div className={`comments-modal-overlay ${post ? "show" : ""}`} onClick={onClose}>
       <div
+        ref={dialogRef}
         className="comments-modal-card"
         role="dialog"
         aria-modal="true"
         aria-labelledby="comments-modal-title"
+        tabIndex={-1}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="comments-modal-head">

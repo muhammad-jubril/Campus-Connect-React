@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import ConfirmDialog from "../common/ConfirmDialog";
 import { useAuth } from "../../hooks/useAuth";
 import { usePosts } from "../../hooks/usePosts";
@@ -9,8 +9,10 @@ export default function PostMenu({ post, onEdit }) {
   const { removePost } = usePosts();
   const { showToast } = useToast();
   const rootRef = useRef(null);
+  const menuRef = useRef(null);
   const buttonRef = useRef(null);
-  const firstItemRef = useRef(null);
+  const menuItemRefs = useRef([]);
+  const menuId = useId();
   const [open, setOpen] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -23,19 +25,39 @@ export default function PostMenu({ post, onEdit }) {
     const closeOnOutsidePointer = (event) => {
       if (!rootRef.current?.contains(event.target)) setOpen(false);
     };
+
     const handleKeyDown = (event) => {
       if (event.key === "Escape") {
         event.preventDefault();
         setOpen(false);
         buttonRef.current?.focus();
+        return;
+      }
+
+      if (!menuRef.current) return;
+      const items = menuItemRefs.current.filter(Boolean);
+      if (items.length === 0) return;
+
+      if (["ArrowDown", "ArrowUp", "Home", "End"].includes(event.key)) {
+        event.preventDefault();
+        const currentIndex = items.indexOf(document.activeElement);
+        let nextIndex = currentIndex;
+
+        if (event.key === "ArrowDown") nextIndex = currentIndex < 0 ? 0 : (currentIndex + 1) % items.length;
+        if (event.key === "ArrowUp") nextIndex = currentIndex < 0 ? items.length - 1 : (currentIndex - 1 + items.length) % items.length;
+        if (event.key === "Home") nextIndex = 0;
+        if (event.key === "End") nextIndex = items.length - 1;
+
+        items[nextIndex]?.focus();
       }
     };
 
+    const focusFirstItem = window.requestAnimationFrame(() => menuItemRefs.current[0]?.focus());
     document.addEventListener("pointerdown", closeOnOutsidePointer);
     document.addEventListener("keydown", handleKeyDown);
-    window.requestAnimationFrame(() => firstItemRef.current?.focus());
 
     return () => {
+      window.cancelAnimationFrame(focusFirstItem);
       document.removeEventListener("pointerdown", closeOnOutsidePointer);
       document.removeEventListener("keydown", handleKeyDown);
     };
@@ -73,6 +95,9 @@ export default function PostMenu({ post, onEdit }) {
       ref={rootRef}
       style={{ position: "relative", flexShrink: 0 }}
       onClick={(event) => event.stopPropagation()}
+      onBlur={(event) => {
+        if (!event.currentTarget.contains(event.relatedTarget)) setOpen(false);
+      }}
     >
       <button
         ref={buttonRef}
@@ -80,6 +105,7 @@ export default function PostMenu({ post, onEdit }) {
         aria-label="Post options"
         aria-haspopup="menu"
         aria-expanded={open}
+        aria-controls={open ? menuId : undefined}
         onClick={() => setOpen((prev) => !prev)}
         style={{
           width: 32,
@@ -103,6 +129,8 @@ export default function PostMenu({ post, onEdit }) {
 
       {open && (
         <div
+          id={menuId}
+          ref={menuRef}
           role="menu"
           aria-label="Post actions"
           style={{
@@ -119,17 +147,20 @@ export default function PostMenu({ post, onEdit }) {
           }}
         >
           <button
-            ref={firstItemRef}
+            ref={(element) => { menuItemRefs.current[0] = element; }}
             type="button"
             role="menuitem"
+            tabIndex={-1}
             onClick={handleEdit}
             style={menuItemStyle}
           >
             Edit
           </button>
           <button
+            ref={(element) => { menuItemRefs.current[1] = element; }}
             type="button"
             role="menuitem"
+            tabIndex={-1}
             onClick={handleDeleteRequest}
             style={{ ...menuItemStyle, color: "var(--accent-red)" }}
           >
