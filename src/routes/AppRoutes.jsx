@@ -5,7 +5,6 @@ import ProtectedRoute from "./ProtectedRoute";
 import PublicRoute from "./PublicRoute";
 
 import AuthLayout from "../components/auth/AuthLayout";
-import StepIndicator from "../components/auth/StepIndicator";
 import ProfileSetup from "../components/auth/ProfileSetup";
 import ResetPassword from "../components/auth/ResetPassword";
 import ProfileLoadError from "../components/auth/ProfileLoadError";
