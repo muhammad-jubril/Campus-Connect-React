@@ -59,14 +59,6 @@ export default function FeedPage() {
         <div className="home-welcome-orbit" aria-hidden="true"><span /><span /><span /></div>
       </div>
 
-      <div className="campus-pulse-strip" aria-label="Campus pulse">
-        <div><span>ACTIVE</span><strong>2,340</strong></div>
-        <i />
-        <div><span>POSTS TODAY</span><strong>186</strong></div>
-        <i />
-        <div><span>THIS WEEK</span><strong>412</strong></div>
-      </div>
-
       {loading ? (
         <FeedSkeleton />
       ) : postsError ? (
