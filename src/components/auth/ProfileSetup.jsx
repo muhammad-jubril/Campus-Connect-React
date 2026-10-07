@@ -8,13 +8,14 @@ import { uploadToStorage } from "../../services/supabase/storage";
 import { useAuth } from "../../hooks/useAuth";
 import { useLoader } from "../../hooks/useLoader";
 import { useToast } from "../../hooks/useToast";
-import { USERNAME_RE, joinList } from "../../utils/validation";
+import { isReservedUsername, USERNAME_RE, joinList } from "../../utils/validation";
 import { checkAvatar, uploadCheckMessage } from "../../utils/uploadChecks";
 import { getUploadErrorMessage } from "../../utils/uploadErrors";
 import { compressImage } from "../../utils/imageCompression";
 
 const MAX_NAME_LENGTH = 60;
 const MAX_AVATAR_DIMENSION = 512;
+const RESERVED_USERNAME_MESSAGE = "That username isn't available";
 
 export default function ProfileSetup({
   initialProfileData,
@@ -43,6 +44,9 @@ export default function ProfileSetup({
   const { runWithLoader } = useLoader();
   const { showToast } = useToast();
 
+  const usernameReserved = isReservedUsername(username);
+  const usernameValid = USERNAME_RE.test(username) && !usernameReserved;
+
   async function handleAvatarChange(e) {
     const file = e.target.files?.[0];
     e.target.value = "";
@@ -67,6 +71,11 @@ export default function ProfileSetup({
   }
 
   async function handleResumeContinue() {
+    if (usernameReserved) {
+      showToast(RESERVED_USERNAME_MESSAGE, "error");
+      return;
+    }
+
     if (!USERNAME_RE.test(username)) {
       showToast("Enter a valid username to continue", "error");
       return;
@@ -141,8 +150,13 @@ export default function ProfileSetup({
     event.preventDefault();
     if (submitting) return;
 
+    if (isResume && usernameReserved) {
+      showToast(RESERVED_USERNAME_MESSAGE, "error");
+      return;
+    }
+
     const missing = [];
-    if (isResume && !USERNAME_RE.test(username)) missing.push("a valid username");
+    if (isResume && !usernameValid) missing.push("a valid username");
     if (!name.trim()) missing.push("your name");
     if (!faculty) missing.push("your faculty");
     else if (!department) missing.push("your department");
@@ -174,7 +188,6 @@ export default function ProfileSetup({
     await logout();
   }
 
-  const usernameValid = USERNAME_RE.test(username);
   const valid = !!(
     (!isResume || usernameValid) &&
     name.trim() &&
@@ -207,8 +220,8 @@ export default function ProfileSetup({
               ? "That username is already taken — try another"
               : undefined
           }
-          hintState={usernameTaken ? "taken" : usernameValid ? "ok" : "default"}
-          error={usernameTaken}
+          hintState={usernameTaken || usernameReserved ? "taken" : usernameValid ? "ok" : "default"}
+          error={usernameTaken || usernameReserved}
         />
       )}
 

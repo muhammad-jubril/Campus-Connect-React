@@ -1,6 +1,31 @@
 export const USERNAME_RE = /^[a-zA-Z0-9_]{6,16}$/;
 export const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
+export const RESERVED_USERNAMES = new Set([
+  "admin",
+  "administrator",
+  "support",
+  "help",
+  "staff",
+  "moderator",
+  "mod",
+  "official",
+  "campusconnect",
+  "campus_connect",
+  "nwu",
+  "security",
+  "system",
+  "root",
+  "null",
+  "undefined",
+  "api",
+  "www",
+]);
+
+export function isReservedUsername(username) {
+  return RESERVED_USERNAMES.has(String(username || "").trim().toLowerCase());
+}
+
 export function checkPasswordRules(pw) {
   return { length: pw.length >= 8, lower: /[a-z]/.test(pw), upper: /[A-Z]/.test(pw), number: /[0-9]/.test(pw) };
 }

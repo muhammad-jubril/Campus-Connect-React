@@ -6,7 +6,9 @@ import BackButton from "../common/BackButton";
 import { checkUsernameAvailable } from "../../services/supabase/profiles";
 import { useLoader } from "../../hooks/useLoader";
 import { useToast } from "../../hooks/useToast";
-import { USERNAME_RE, isPasswordValid, joinList } from "../../utils/validation";
+import { isReservedUsername, USERNAME_RE, isPasswordValid, joinList } from "../../utils/validation";
+
+const RESERVED_USERNAME_MESSAGE = "That username isn't available";
 
 export default function SignupForm({ initialUsername, initialPassword, onNext, onBack }) {
   const [username, setUsername] = useState(initialUsername || "");
@@ -18,13 +20,19 @@ export default function SignupForm({ initialUsername, initialPassword, onNext, o
   const { runWithLoader } = useLoader();
   const { showToast } = useToast();
 
-  const usernameValid = USERNAME_RE.test(username);
+  const usernameReserved = isReservedUsername(username);
+  const usernameValid = USERNAME_RE.test(username) && !usernameReserved;
   const passwordValid = isPasswordValid(password);
   const confirmValid = confirmPassword.length > 0 && confirmPassword === password;
 
   async function handleContinue(event) {
     event.preventDefault();
     if (submitting) return;
+
+    if (usernameReserved) {
+      showToast(RESERVED_USERNAME_MESSAGE, "error");
+      return;
+    }
 
     const missing = [];
     if (!usernameValid) missing.push("a valid username");
@@ -87,7 +95,7 @@ export default function SignupForm({ initialUsername, initialPassword, onNext, o
             : undefined
         }
         hintState={usernameTaken ? "taken" : usernameValid ? "ok" : "default"}
-        error={usernameTaken}
+        error={usernameTaken || usernameReserved}
       />
 
       <PasswordField
