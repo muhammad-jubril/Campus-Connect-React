@@ -80,9 +80,10 @@ export default function AppRoutes() {
         <Route path="/signup" element={<SignupPage />} />
         <Route path="/forgot-password" element={<ForgotPasswordPage />} />
         <Route path="/reset-password" element={<ResetPasswordPage />} />
-        <Route path="/terms" element={<TermsPage />} />
-        <Route path="/privacy" element={<PrivacyPage />} />
       </Route>
+
+      <Route path="/terms" element={<TermsPage />} />
+      <Route path="/privacy" element={<PrivacyPage />} />
 
       <Route element={<ProtectedRoute />}>
         <Route path="/welcome" element={<WelcomePage />} />
@@ -122,10 +123,10 @@ export default function AppRoutes() {
         <Route path="/profile/:username" element={<ScreenLayout><ProfilePage /></ScreenLayout>} />
         <Route path="/groups" element={<ScreenLayout><ComingSoonPage title="Groups" blurb="Find and join student groups around campus — coming soon." icon={icon("M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M22 21v-2a4 4 0 0 0-3-3.87M9 7a4 4 0 1 0 0-8 4 4 0 0 0 0 8M16 3.13a4 4 0 0 1 0 7.75")} /></ScreenLayout>} />
         <Route path="/communities" element={<ScreenLayout><ComingSoonPage title="Communities" blurb="Discover campus communities and shared interests — coming soon." icon={icon("M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.5 8.5 0 0 1 4.7-7.6")} /></ScreenLayout>} />
-        <Route path="/lost-found" element={<ScreenLayout><ComingSoonPage title="Lost & Found" blurb="Help students reunite with things they have lost on campus — coming soon." icon={icon("M11 4a7 7 0 1 0 0 14 7 7 0 0 0 0-14M20 20l-4-4M8.5 11h5")} /></ScreenLayout>} />
+        <Route path="/lost-found" element={<ScreenLayout><ComingSoonPage title="Lost & Found" blurb="Help students reunite with things they have lost on campus — coming soon." icon={icon("M11 4a7 7 0 1 0 0 14 7 7 0 0 0-7-14M20 20l-4-4M8.5 11h5")} /></ScreenLayout>} />
         <Route path="/settings" element={<ScreenLayout><ComingSoonPage title="Settings" blurb="Account and app preferences will live here — coming soon." icon={icon("M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8")} /></ScreenLayout>} />
-        <Route path="/help" element={<ScreenLayout><ComingSoonPage title="Help & Support" blurb="Guides, support, and the Campus Connect app tour will live here." icon={icon("M12 17h.01M9.6 9a2.5 2.5 0 1 1 4.5 1.5c-.8 1-2.1 1.2-2.1 2.7M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-9")} /></ScreenLayout>} />
-        <Route path="/chats" element={<ScreenLayout><ComingSoonPage title="Chats" blurb="Private student messaging is coming soon." icon={icon("M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7")} /></ScreenLayout>} />
+        <Route path="/help" element={<ScreenLayout><ComingSoonPage title="Help & Support" blurb="Guides, support, and the Campus Connect app tour will live here." icon={icon("M12 17h.01M9.6 9a2.5 2.5 0 1 1 4.5 1.5c-.8 1-2.1 1.2-2.1 2.7M12 3a9 9 0 1 0 0 18 9 9 0 0 0-9-9")} /></ScreenLayout>} />
+        <Route path="/chats" element={<ScreenLayout><ComingSoonPage title="Chats" blurb="Private student messaging is coming soon." icon={icon("M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7l-6.5 1.5 1.9-5.7")} /></ScreenLayout>} />
       </Route>
 
       <Route path="*" element={<NotFoundPage />} />

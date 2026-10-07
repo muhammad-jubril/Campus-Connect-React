@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import PasswordField from "../common/PasswordField";
 import { useAuth } from "../../hooks/useAuth";
 import { useLoader } from "../../hooks/useLoader";
@@ -14,6 +14,19 @@ const AUTH_ERROR_MESSAGES = {
   unknown: "Something went wrong. Please try again.",
 };
 
+function getSafeLoginDestination(locationState) {
+  const from = locationState?.from;
+  const pathname = typeof from?.pathname === "string" ? from.pathname : "";
+
+  if (!pathname || !pathname.startsWith("/") || pathname.startsWith("//")) {
+    return "/feed";
+  }
+
+  const search = typeof from.search === "string" ? from.search : "";
+  const hash = typeof from.hash === "string" ? from.hash : "";
+  return `${pathname}${search}${hash}`;
+}
+
 export default function LoginForm() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -22,6 +35,8 @@ export default function LoginForm() {
   const { login } = useAuth();
   const { runWithLoader } = useLoader();
   const { showToast } = useToast();
+  const location = useLocation();
+  const navigate = useNavigate();
 
   async function handleLogin(event) {
     event.preventDefault();
@@ -50,6 +65,7 @@ export default function LoginForm() {
 
       if (loggedIn) {
         showToast("Logged in");
+        navigate(getSafeLoginDestination(location.state), { replace: true });
       }
     } catch (err) {
       console.error("Login failed:", err);

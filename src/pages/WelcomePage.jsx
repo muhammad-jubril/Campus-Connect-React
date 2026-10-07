@@ -3,15 +3,40 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
 
 // Brief congratulatory moment after finishing signup, then auto-advances
-// into the real feed — matches the vanilla build's 2.6s timed transition.
+// into the real feed — only shown once per account on this browser.
 export default function WelcomePage() {
   const { currentUser } = useAuth();
   const navigate = useNavigate();
 
   useEffect(() => {
+    if (!currentUser?.id) {
+      navigate("/feed", { replace: true });
+      return undefined;
+    }
+
+    const key = `cc_welcome_seen_${currentUser.id}`;
+    let hasSeenWelcome = false;
+
+    try {
+      hasSeenWelcome = localStorage.getItem(key) === "1";
+    } catch {
+      // Storage can be unavailable in privacy-restricted browser contexts.
+    }
+
+    if (hasSeenWelcome) {
+      navigate("/feed", { replace: true });
+      return undefined;
+    }
+
+    try {
+      localStorage.setItem(key, "1");
+    } catch {
+      // The screen can still be shown for this visit when persistence fails.
+    }
+
     const t = setTimeout(() => navigate("/feed", { replace: true }), 2600);
     return () => clearTimeout(t);
-  }, [navigate]);
+  }, [currentUser, navigate]);
 
   const firstName = currentUser ? currentUser.name.split(" ")[0] : "Student";
 
