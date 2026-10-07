@@ -1,6 +1,6 @@
 import { useState } from "react";
 import PasswordField from "../common/PasswordField";
-import { updatePassword } from "../../services/supabase/auth";
+import { signOut, updatePassword } from "../../services/supabase/auth";
 import { useAuth } from "../../hooks/useAuth";
 import { useLoader } from "../../hooks/useLoader";
 import { useToast } from "../../hooks/useToast";
@@ -33,6 +33,12 @@ export default function ResetPassword() {
       await runWithLoader("Setting your new password…", async () => {
         const { error } = await updatePassword(password);
         if (error) throw error;
+
+        // The recovery session stays active, while every other session is
+        // revoked so a previously stolen session cannot remain usable.
+        const { error: otherSessionsError } = await signOut({ scope: "others" });
+        if (otherSessionsError) throw otherSessionsError;
+
         await completeRecovery();
       });
       showToast("Password updated — you're logged in");

@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useRef, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 import * as postsApi from "../services/supabase/posts";
 import { useAuth } from "./useAuth";
 import { usePeople } from "./usePeople";
@@ -11,20 +11,49 @@ const PostsContext = createContext(null);
 // place needs to be reflected in the other without a re-fetch.
 export function PostsProvider({ children }) {
   const [posts, setPosts] = useState([]);
+  const [postsOwnerId, setPostsOwnerId] = useState(null);
   const [activeCommentsPostId, setActiveCommentsPostId] = useState(null);
   const loadedRef = useRef(false);
+  const loadedUserIdRef = useRef(null);
+  const cacheEpochRef = useRef(0);
+  const lastUserIdRef = useRef(null);
   const commentsTriggerRef = useRef(null);
   const { currentUser } = useAuth();
   const { warmPeople } = usePeople();
   const { showToast } = useToast();
+  const currentUserId = currentUser?.id || null;
+
+  if (lastUserIdRef.current !== currentUserId) {
+    lastUserIdRef.current = currentUserId;
+    cacheEpochRef.current += 1;
+  }
+
+  useEffect(() => {
+    if (loadedUserIdRef.current === currentUserId) return;
+
+    setPosts([]);
+    setPostsOwnerId(null);
+    loadedRef.current = false;
+    loadedUserIdRef.current = null;
+    setActiveCommentsPostId(null);
+    commentsTriggerRef.current = null;
+  }, [currentUserId]);
 
   const loadPosts = useCallback(async (force = false) => {
-    if (loadedRef.current && !force) return;
+    const requestUserId = currentUserId;
+    const requestEpoch = cacheEpochRef.current;
+    if (loadedRef.current && loadedUserIdRef.current === requestUserId && !force) return;
+
+    const rows = await postsApi.fetchPosts(requestUserId);
+
+    if (cacheEpochRef.current !== requestEpoch || lastUserIdRef.current !== requestUserId) return;
+
     loadedRef.current = true;
-    const rows = await postsApi.fetchPosts(currentUser && currentUser.id);
+    loadedUserIdRef.current = requestUserId;
     setPosts(rows);
+    setPostsOwnerId(requestUserId);
     warmPeople(rows.map((p) => p.authorUsername));
-  }, [currentUser, warmPeople]);
+  }, [currentUserId, warmPeople]);
 
   const addPost = useCallback((post) => {
     setPosts((prev) => [post, ...prev]);
@@ -82,10 +111,12 @@ export function PostsProvider({ children }) {
     }
   }, []);
 
+  const visiblePosts = postsOwnerId === currentUserId ? posts : [];
+
   return (
     <PostsContext.Provider value={{
-      posts, loadPosts, addPost, updatePostText, removePost, toggleLike, bumpCommentCount,
-      activePost: posts.find((p) => p.id === activeCommentsPostId) || null,
+      posts: visiblePosts, loadPosts, addPost, updatePostText, removePost, toggleLike, bumpCommentCount,
+      activePost: visiblePosts.find((p) => p.id === activeCommentsPostId) || null,
       openComments,
       closeComments,
     }}>

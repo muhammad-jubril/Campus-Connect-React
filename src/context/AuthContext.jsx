@@ -156,7 +156,7 @@ export function AuthProvider({ children }) {
   }
 
   async function logout() {
-    await supabaseSignOut();
+    await supabaseSignOut({ scope: "local" });
   }
 
   // Called once Step 3 (profile setup) actually creates the profiles row —

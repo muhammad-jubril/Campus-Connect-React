@@ -20,8 +20,8 @@ export function signInWithPassword({ email, password }) {
   return supabase.auth.signInWithPassword({ email, password });
 }
 
-export function signOut() {
-  return supabase.auth.signOut();
+export function signOut(options) {
+  return supabase.auth.signOut(options);
 }
 
 export function getSession() {
