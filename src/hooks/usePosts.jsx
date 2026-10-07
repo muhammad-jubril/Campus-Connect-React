@@ -16,6 +16,8 @@ export function PostsProvider({ children }) {
   const [activeCommentsPostId, setActiveCommentsPostId] = useState(null);
   const loadedRef = useRef(false);
   const loadedUserIdRef = useRef(null);
+  const loadedScopeRef = useRef(null);
+  const loadRequestRef = useRef(0);
   const cacheEpochRef = useRef(0);
   const lastUserIdRef = useRef(null);
   const commentsTriggerRef = useRef(null);
@@ -37,38 +39,96 @@ export function PostsProvider({ children }) {
     setPostsError(null);
     loadedRef.current = false;
     loadedUserIdRef.current = null;
+    loadedScopeRef.current = null;
+    loadRequestRef.current += 1;
     setActiveCommentsPostId(null);
     commentsTriggerRef.current = null;
   }, [currentUserId]);
 
+  const commitLoadedPosts = useCallback((rows, scope, requestUserId) => {
+    loadedRef.current = true;
+    loadedUserIdRef.current = requestUserId;
+    loadedScopeRef.current = scope;
+    setPostsError(null);
+    setPosts(rows);
+    setPostsOwnerId(requestUserId);
+    warmPeople(rows.map((p) => p.authorUsername));
+  }, [warmPeople]);
+
   const loadPosts = useCallback(async (force = false) => {
     const requestUserId = currentUserId;
     const requestEpoch = cacheEpochRef.current;
-    if (loadedRef.current && loadedUserIdRef.current === requestUserId && !force) return true;
+    const scope = "feed";
+    if (loadedRef.current && loadedUserIdRef.current === requestUserId && loadedScopeRef.current === scope && !force) return true;
 
+    const requestId = ++loadRequestRef.current;
     setPostsError(null);
+    setPosts([]);
+    setPostsOwnerId(requestUserId);
 
     let rows;
     try {
       rows = await postsApi.fetchPosts(requestUserId);
     } catch (error) {
-      if (cacheEpochRef.current === requestEpoch && lastUserIdRef.current === requestUserId) {
+      if (
+        requestId === loadRequestRef.current &&
+        cacheEpochRef.current === requestEpoch &&
+        lastUserIdRef.current === requestUserId
+      ) {
         setPostsError(error);
-        if (loadedUserIdRef.current !== requestUserId) loadedRef.current = false;
+        loadedRef.current = false;
+        loadedScopeRef.current = null;
       }
       return false;
     }
 
-    if (cacheEpochRef.current !== requestEpoch || lastUserIdRef.current !== requestUserId) return false;
+    if (
+      requestId !== loadRequestRef.current ||
+      cacheEpochRef.current !== requestEpoch ||
+      lastUserIdRef.current !== requestUserId
+    ) return false;
 
-    loadedRef.current = true;
-    loadedUserIdRef.current = requestUserId;
-    setPostsError(null);
-    setPosts(rows);
-    setPostsOwnerId(requestUserId);
-    warmPeople(rows.map((p) => p.authorUsername));
+    commitLoadedPosts(rows, scope, requestUserId);
     return true;
-  }, [currentUserId, warmPeople]);
+  }, [commitLoadedPosts, currentUserId]);
+
+  const loadPostsByAuthor = useCallback(async (authorId, force = false) => {
+    const requestUserId = currentUserId;
+    const requestEpoch = cacheEpochRef.current;
+    const scope = `author:${authorId}`;
+    if (!authorId) return false;
+    if (loadedRef.current && loadedUserIdRef.current === requestUserId && loadedScopeRef.current === scope && !force) return true;
+
+    const requestId = ++loadRequestRef.current;
+    setPostsError(null);
+    setPosts([]);
+    setPostsOwnerId(requestUserId);
+
+    let rows;
+    try {
+      rows = await postsApi.getPostsByAuthor(authorId, requestUserId);
+    } catch (error) {
+      if (
+        requestId === loadRequestRef.current &&
+        cacheEpochRef.current === requestEpoch &&
+        lastUserIdRef.current === requestUserId
+      ) {
+        setPostsError(error);
+        loadedRef.current = false;
+        loadedScopeRef.current = null;
+      }
+      return false;
+    }
+
+    if (
+      requestId !== loadRequestRef.current ||
+      cacheEpochRef.current !== requestEpoch ||
+      lastUserIdRef.current !== requestUserId
+    ) return false;
+
+    commitLoadedPosts(rows, scope, requestUserId);
+    return true;
+  }, [commitLoadedPosts, currentUserId]);
 
   const addPost = useCallback((post) => {
     setPosts((prev) => [post, ...prev]);
@@ -133,6 +193,7 @@ export function PostsProvider({ children }) {
       posts: visiblePosts,
       postsError,
       loadPosts,
+      loadPostsByAuthor,
       addPost,
       updatePostText,
       removePost,

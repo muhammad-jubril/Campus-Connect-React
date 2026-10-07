@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import Avatar from "../components/common/Avatar";
+import FeedSkeleton from "../components/common/Skeleton";
 import PostCard from "../components/feed/PostCard";
 import MobileMenuButton from "../components/layout/MobileMenuButton";
 import { useAuth } from "../hooks/useAuth";
@@ -10,40 +11,69 @@ import { getProfileByUsername, personFromProfileRow } from "../services/supabase
 export default function ProfilePage() {
   const { username } = useParams();
   const { currentUser } = useAuth();
-  const { posts, loadPosts } = usePosts();
+  const { posts, postsError, loadPostsByAuthor } = usePosts();
   const navigate = useNavigate();
   const isOwnProfile = !username || username === currentUser?.username;
 
   const [person, setPerson] = useState(isOwnProfile ? currentUser : null);
   const [notFound, setNotFound] = useState(false);
+  const [loadingPosts, setLoadingPosts] = useState(true);
 
   useEffect(() => {
-    loadPosts();
-    if (isOwnProfile) {
-      setPerson(currentUser);
-      setNotFound(false);
-      return;
-    }
+    let active = true;
 
-    setPerson(null);
-    setNotFound(false);
-    getProfileByUsername(username).then(({ profile, error }) => {
-      if (error || !profile) {
-        setNotFound(true);
+    async function loadProfileAndPosts() {
+      setLoadingPosts(true);
+      setNotFound(false);
+
+      if (isOwnProfile) {
+        setPerson(currentUser);
+        if (!currentUser?.id) {
+          if (active) setLoadingPosts(false);
+          return;
+        }
+
+        await loadPostsByAuthor(currentUser.id);
+        if (active) setLoadingPosts(false);
         return;
       }
-      setPerson(personFromProfileRow(profile));
-    });
-  }, [username, isOwnProfile, currentUser, loadPosts]);
+
+      setPerson(null);
+      const { profile, error } = await getProfileByUsername(username);
+      if (!active) return;
+
+      if (error || !profile) {
+        setNotFound(true);
+        setLoadingPosts(false);
+        return;
+      }
+
+      const nextPerson = personFromProfileRow(profile);
+      setPerson(nextPerson);
+      await loadPostsByAuthor(profile.id);
+      if (active) setLoadingPosts(false);
+    }
+
+    loadProfileAndPosts();
+
+    return () => {
+      active = false;
+    };
+  }, [username, isOwnProfile, currentUser, loadPostsByAuthor]);
+
+  async function handleRetryPosts() {
+    if (!person?.id) return;
+    setLoadingPosts(true);
+    await loadPostsByAuthor(person.id, true);
+    setLoadingPosts(false);
+  }
 
   if (notFound) {
     return <div className="profile-page"><h2 className="display">Student not found</h2></div>;
   }
   if (!person) return null;
 
-  const theirPosts = posts
-    .filter((post) => post.authorUsername === person.username)
-    .sort((a, b) => b.createdAt - a.createdAt);
+  const theirPosts = posts.filter((post) => post.authorId === person.id);
 
   return (
     <div className="profile-page">
@@ -101,10 +131,21 @@ export default function ProfilePage() {
       </div>
 
       <div className="profile-section-head">
-        <h3 className="section-label">Your posts</h3>
+        <h3 className="section-label">{isOwnProfile ? "Your posts" : "Posts"}</h3>
       </div>
 
-      {theirPosts.length === 0 ? (
+      {loadingPosts ? (
+        <FeedSkeleton />
+      ) : postsError ? (
+        <div className="empty-state" style={{ paddingTop: 24 }} role="alert">
+          <p className="subtitle" style={{ marginBottom: 14, maxWidth: 280 }}>
+            We couldn’t load these posts. Check your connection and try again.
+          </p>
+          <button type="button" className="btn btn-primary" style={{ width: "auto", padding: "10px 20px" }} onClick={handleRetryPosts}>
+            Try again
+          </button>
+        </div>
+      ) : theirPosts.length === 0 ? (
         <div className="empty-state" style={{ paddingTop: 24 }}>
           <p className="subtitle" style={{ marginBottom: 0 }}>
             {isOwnProfile ? "You haven't posted anything yet." : "No posts yet."}

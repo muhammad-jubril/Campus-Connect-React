@@ -20,13 +20,17 @@ function postRowToPost(row) {
   };
 }
 
-export async function fetchPosts(currentUserId) {
-  const { data: postRows, error } = await supabase
+async function fetchPostsForQuery(currentUserId, authorId = null) {
+  let query = supabase
     .from("posts")
     .select("id, author_id, text, media_type, media_urls, created_at, edited_at, profiles!posts_author_id_fkey(username)")
     .order("created_at", { ascending: false });
+
+  if (authorId) query = query.eq("author_id", authorId);
+
+  const { data: postRows, error } = await query;
   if (error) throw error;
-  if (!postRows) throw new Error("Feed data unavailable");
+  if (!postRows) throw new Error("Post data unavailable");
 
   const postIds = postRows.map((r) => r.id);
   let likeCounts = {};
@@ -57,6 +61,14 @@ export async function fetchPosts(currentUserId) {
     liked_by_me: myLikes.has(row.id),
     comment_count: commentCounts[row.id] || 0,
   }));
+}
+
+export async function fetchPosts(currentUserId) {
+  return fetchPostsForQuery(currentUserId);
+}
+
+export async function getPostsByAuthor(authorId, currentUserId) {
+  return fetchPostsForQuery(currentUserId, authorId);
 }
 
 export async function createPost({ authorId, authorUsername, text, mediaType, mediaUrls }) {
