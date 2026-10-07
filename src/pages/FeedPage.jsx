@@ -6,13 +6,28 @@ import MobileMenuButton from "../components/layout/MobileMenuButton";
 import { usePosts } from "../hooks/usePosts";
 
 export default function FeedPage() {
-  const { posts, loadPosts } = usePosts();
+  const { posts, postsError, loadPosts } = usePosts();
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
 
   useEffect(() => {
-    loadPosts().then(() => setLoading(false));
+    let active = true;
+
+    async function loadFeed() {
+      setLoading(true);
+      await loadPosts();
+      if (active) setLoading(false);
+    }
+
+    loadFeed();
+    return () => { active = false; };
   }, [loadPosts]);
+
+  async function handleRetry() {
+    setLoading(true);
+    await loadPosts(true);
+    setLoading(false);
+  }
 
   return (
     <div className="feed-page">
@@ -54,6 +69,23 @@ export default function FeedPage() {
 
       {loading ? (
         <FeedSkeleton />
+      ) : postsError ? (
+        <div className="empty-state" style={{ paddingTop: 48 }} role="alert">
+          <div className="empty-state-icon">
+            <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M12 9v4" />
+              <path d="M12 17h.01" />
+              <path d="M10.3 3.6 2.8 17a2 2 0 0 0 1.75 3h14.9a2 2 0 0 0 1.75-3L13.7 3.6a2 2 0 0 0-3.4 0Z" />
+            </svg>
+          </div>
+          <span className="empty-state-tag">Feed unavailable</span>
+          <p className="subtitle" style={{ marginBottom: 14, maxWidth: 280 }}>
+            We couldn’t load the campus feed. Check your connection and try again.
+          </p>
+          <button type="button" className="btn btn-primary" style={{ width: "auto", padding: "10px 20px" }} onClick={handleRetry}>
+            Try again
+          </button>
+        </div>
       ) : posts.length === 0 ? (
         <div className="empty-state" style={{ paddingTop: 48 }}>
           <div className="empty-state-icon">

@@ -12,6 +12,7 @@ const PostsContext = createContext(null);
 export function PostsProvider({ children }) {
   const [posts, setPosts] = useState([]);
   const [postsOwnerId, setPostsOwnerId] = useState(null);
+  const [postsError, setPostsError] = useState(null);
   const [activeCommentsPostId, setActiveCommentsPostId] = useState(null);
   const loadedRef = useRef(false);
   const loadedUserIdRef = useRef(null);
@@ -33,6 +34,7 @@ export function PostsProvider({ children }) {
 
     setPosts([]);
     setPostsOwnerId(null);
+    setPostsError(null);
     loadedRef.current = false;
     loadedUserIdRef.current = null;
     setActiveCommentsPostId(null);
@@ -42,17 +44,30 @@ export function PostsProvider({ children }) {
   const loadPosts = useCallback(async (force = false) => {
     const requestUserId = currentUserId;
     const requestEpoch = cacheEpochRef.current;
-    if (loadedRef.current && loadedUserIdRef.current === requestUserId && !force) return;
+    if (loadedRef.current && loadedUserIdRef.current === requestUserId && !force) return true;
 
-    const rows = await postsApi.fetchPosts(requestUserId);
+    setPostsError(null);
 
-    if (cacheEpochRef.current !== requestEpoch || lastUserIdRef.current !== requestUserId) return;
+    let rows;
+    try {
+      rows = await postsApi.fetchPosts(requestUserId);
+    } catch (error) {
+      if (cacheEpochRef.current === requestEpoch && lastUserIdRef.current === requestUserId) {
+        setPostsError(error);
+        if (loadedUserIdRef.current !== requestUserId) loadedRef.current = false;
+      }
+      return false;
+    }
+
+    if (cacheEpochRef.current !== requestEpoch || lastUserIdRef.current !== requestUserId) return false;
 
     loadedRef.current = true;
     loadedUserIdRef.current = requestUserId;
+    setPostsError(null);
     setPosts(rows);
     setPostsOwnerId(requestUserId);
     warmPeople(rows.map((p) => p.authorUsername));
+    return true;
   }, [currentUserId, warmPeople]);
 
   const addPost = useCallback((post) => {
@@ -115,7 +130,14 @@ export function PostsProvider({ children }) {
 
   return (
     <PostsContext.Provider value={{
-      posts: visiblePosts, loadPosts, addPost, updatePostText, removePost, toggleLike, bumpCommentCount,
+      posts: visiblePosts,
+      postsError,
+      loadPosts,
+      addPost,
+      updatePostText,
+      removePost,
+      toggleLike,
+      bumpCommentCount,
       activePost: visiblePosts.find((p) => p.id === activeCommentsPostId) || null,
       openComments,
       closeComments,

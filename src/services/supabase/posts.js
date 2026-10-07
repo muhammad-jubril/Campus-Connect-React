@@ -25,22 +25,29 @@ export async function fetchPosts(currentUserId) {
     .from("posts")
     .select("id, author_id, text, media_type, media_urls, created_at, edited_at, profiles!posts_author_id_fkey(username)")
     .order("created_at", { ascending: false });
-  if (error || !postRows) { console.warn("fetchPosts failed:", error); return []; }
+  if (error) throw error;
+  if (!postRows) throw new Error("Feed data unavailable");
 
   const postIds = postRows.map((r) => r.id);
   let likeCounts = {};
   let myLikes = new Set();
   let commentCounts = {};
   if (postIds.length > 0) {
-    const [{ data: likeRows }, { data: commentRows }] = await Promise.all([
+    const [likeResult, commentResult] = await Promise.all([
       supabase.from("likes").select("post_id, user_id").in("post_id", postIds),
       supabase.from("comments").select("post_id").in("post_id", postIds),
     ]);
-    (likeRows || []).forEach((l) => {
+
+    if (likeResult.error) throw likeResult.error;
+    if (commentResult.error) throw commentResult.error;
+
+    (likeResult.data || []).forEach((l) => {
       likeCounts[l.post_id] = (likeCounts[l.post_id] || 0) + 1;
       if (currentUserId && l.user_id === currentUserId) myLikes.add(l.post_id);
     });
-    (commentRows || []).forEach((c) => { commentCounts[c.post_id] = (commentCounts[c.post_id] || 0) + 1; });
+    (commentResult.data || []).forEach((c) => {
+      commentCounts[c.post_id] = (commentCounts[c.post_id] || 0) + 1;
+    });
   }
 
   return postRows.map((row) => postRowToPost({
