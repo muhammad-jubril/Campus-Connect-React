@@ -36,6 +36,12 @@ export function AuthProvider({ children }) {
   // there's no `currentUser` shape yet.
   const [pendingAccount, setPendingAccount] = useState(null);
   const handlingRecoveryRef = useRef(false);
+  function clearSignedOutState() {
+    handlingRecoveryRef.current = false;
+    setCurrentUser(null);
+    setPendingAccount(null);
+    setStatus(STATUS.SIGNED_OUT);
+  }
 
   async function resolveSessionUser(sessionUser) {
     let profileResult;
@@ -104,9 +110,7 @@ export function AuthProvider({ children }) {
 
     const session = data && data.session;
     if (!session) {
-      setCurrentUser(null);
-      setPendingAccount(null);
-      setStatus(STATUS.SIGNED_OUT);
+      clearSignedOutState();
       return;
     }
 
@@ -118,7 +122,21 @@ export function AuthProvider({ children }) {
       if (event === "PASSWORD_RECOVERY") {
         handlingRecoveryRef.current = true;
         setStatus(STATUS.PASSWORD_RECOVERY);
+        return;
       }
+
+      if (event === "SIGNED_OUT") {
+        // Supabase emits this for both explicit sign-outs and sessions that
+        // disappear elsewhere (for example another tab or session expiry).
+        // This is the single state transition path, so local logout cannot
+        // race or duplicate the cleanup with a second manual update.
+        clearSignedOutState();
+        return;
+      }
+
+      // TOKEN_REFRESHED and USER_UPDATED do not change the app's auth status.
+      // SIGNED_IN is also intentionally ignored here because login() resolves
+      // the profile exactly once after signInWithPassword() succeeds.
     });
 
     refreshAuth();
@@ -130,15 +148,15 @@ export function AuthProvider({ children }) {
     const { data, error } = await signInWithPassword({ email, password });
     if (error) throw new Error(classifyAuthError(error));
 
+    // Supabase may emit SIGNED_IN as part of this call. We intentionally don't
+    // resolve the profile from the event callback, so this path stays single-
+    // source-of-truth for login and cannot double-load the profile.
     const resolvedStatus = await resolveSessionUser(data.user);
     return resolvedStatus === STATUS.SIGNED_IN;
   }
 
   async function logout() {
     await supabaseSignOut();
-    setCurrentUser(null);
-    setPendingAccount(null);
-    setStatus(STATUS.SIGNED_OUT);
   }
 
   // Called once Step 3 (profile setup) actually creates the profiles row —
