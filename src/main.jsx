@@ -8,6 +8,7 @@ import "./styles/loading.css";
 import "./styles/feed.css";
 import "./styles/composer.css";
 import "./styles/shell.css";
+import "./styles/shell-pages.css";
 import "./styles/forms.css";
 import "./styles/auth.css";
 
