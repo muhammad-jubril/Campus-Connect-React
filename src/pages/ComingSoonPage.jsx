@@ -7,7 +7,7 @@ export default function ComingSoonPage({ title, eyebrow, icon, blurb, shell = fa
         <h2 className="display" style={{ marginBottom: 8 }}>{title}</h2>
         <div className="empty-state" style={{ paddingTop: 64 }}>
           <div className="empty-state-icon">{icon}</div>
-          <span className="empty-state-tag">Not ported yet</span>
+          <span className="empty-state-tag">Coming soon</span>
           <p className="subtitle" style={{ marginBottom: 0, maxWidth: 260 }}>{blurb}</p>
         </div>
       </div>
@@ -27,7 +27,7 @@ export default function ComingSoonPage({ title, eyebrow, icon, blurb, shell = fa
 
       <div className="empty-state shell-coming-soon-empty">
         <div className="empty-state-icon">{icon}</div>
-        <span className="empty-state-tag">Not ported yet</span>
+        <span className="empty-state-tag">Coming soon</span>
         <p className="subtitle" style={{ marginBottom: 0, maxWidth: 260 }}>{blurb}</p>
       </div>
     </div>
