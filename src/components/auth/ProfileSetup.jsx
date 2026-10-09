@@ -284,6 +284,7 @@ export default function ProfileSetup({
             <option>300</option>
             <option>400</option>
             <option>500</option>
+            <option>600</option>
           </select>
         </div>
       </div>

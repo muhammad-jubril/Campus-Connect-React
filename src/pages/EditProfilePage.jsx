@@ -141,6 +141,7 @@ export default function EditProfilePage() {
           <select value={level} onChange={(e) => setLevel(e.target.value)}>
             <option value="">Select level</option>
             <option>100</option><option>200</option><option>300</option><option>400</option><option>500</option>
+            <option>600</option>
           </select>
         </div>
       </div>
