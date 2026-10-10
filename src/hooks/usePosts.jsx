@@ -211,6 +211,12 @@ export function PostsProvider({ children }) {
     }
   }, [currentUserId, feedCursor, hasMorePosts, warmPeople]);
 
+  const syncPost = useCallback((post) => {
+    setPosts((previous) => previous.map((existing) => (
+      existing.id === post.id ? { ...existing, ...post } : existing
+    )));
+  }, []);
+
   const addPost = useCallback((post) => {
     setPosts((prev) => [post, ...prev]);
   }, []);
@@ -280,6 +286,7 @@ export function PostsProvider({ children }) {
       loadingMorePosts,
       loadMoreError,
       addPost,
+      syncPost,
       updatePostText,
       removePost,
       toggleLike,

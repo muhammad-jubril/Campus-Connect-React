@@ -92,6 +92,67 @@ async function fetchPostsForQuery(currentUserId, authorId = null) {
   }));
 }
 
+export async function getPostById(postId, currentUserId) {
+  const { data: row, error } = await supabase
+    .from("posts")
+    .select("id, author_id, text, media_type, media_urls, created_at, edited_at, profiles!posts_author_id_fkey(username)")
+    .eq("id", postId)
+    .maybeSingle();
+
+  if (error) throw error;
+  if (!row) return null;
+
+  const [likesResult, commentsResult, likedResult] = await Promise.all([
+    supabase
+      .from("likes")
+      .select("user_id", { count: "exact", head: true })
+      .eq("post_id", postId),
+    supabase
+      .from("comments")
+      .select("id", { count: "exact", head: true })
+      .eq("post_id", postId),
+    currentUserId
+      ? supabase
+          .from("likes")
+          .select("post_id")
+          .eq("post_id", postId)
+          .eq("user_id", currentUserId)
+          .maybeSingle()
+      : Promise.resolve({ data: null, error: null }),
+  ]);
+
+  if (likesResult.error) throw likesResult.error;
+  if (commentsResult.error) throw commentsResult.error;
+  if (likedResult.error) throw likedResult.error;
+
+  return postRowToPost({
+    ...row,
+    author_username: row.profiles ? row.profiles.username : "unknown",
+    like_count: likesResult.count || 0,
+    liked_by_me: !!likedResult.data,
+    comment_count: commentsResult.count || 0,
+  });
+}
+
+export async function recordPostView(postId) {
+  const { data, error } = await supabase.rpc("record_post_view", {
+    p_post_id: postId,
+  });
+
+  if (error) throw error;
+
+  if (data === null || data === undefined) {
+    throw new Error("Post view count unavailable");
+  }
+
+  const count = Number(data);
+  if (!Number.isFinite(count) || count < 0) {
+    throw new Error("Post view count unavailable");
+  }
+
+  return count;
+}
+
 export async function getPostsByAuthor(authorId, currentUserId) {
   return fetchPostsForQuery(currentUserId, authorId);
 }

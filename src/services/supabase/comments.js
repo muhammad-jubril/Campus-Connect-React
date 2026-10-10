@@ -6,7 +6,10 @@ export async function fetchCommentsFor(postId) {
     .select("id, post_id, author_id, text, created_at, profiles!comments_author_id_fkey(username)")
     .eq("post_id", postId)
     .order("created_at", { ascending: true });
-  if (error || !data) return [];
+
+  if (error) throw error;
+  if (!data) throw new Error("Replies unavailable");
+
   return data.map((row) => ({
     id: row.id,
     postId: row.post_id,

@@ -16,6 +16,8 @@ const getFocusableElements = (container) => Array.from(container.querySelectorAl
 
 export default function CommentsModal() {
   const [comments, setComments] = useState(null); // null = loading
+  const [commentsError, setCommentsError] = useState(false);
+  const [commentsReloadKey, setCommentsReloadKey] = useState(0);
   const [text, setText] = useState("");
   const [sending, setSending] = useState(false);
   const [pendingDelete, setPendingDelete] = useState(null);
@@ -32,18 +34,24 @@ export default function CommentsModal() {
     if (!post) return undefined;
     let cancelled = false;
     setComments(null);
+    setCommentsError(false);
     setPendingDelete(null);
-    fetchCommentsFor(post.id).then((rows) => {
-      if (cancelled) return;
-      setComments(rows);
-      warmPeople(rows.map((c) => c.authorUsername));
-    });
+    fetchCommentsFor(post.id)
+      .then((rows) => {
+        if (cancelled) return;
+        setComments(rows);
+        warmPeople(rows.map((c) => c.authorUsername));
+      })
+      .catch((error) => {
+        console.error("Load comments failed:", error);
+        if (!cancelled) setCommentsError(true);
+      });
     const focusTimer = window.requestAnimationFrame(() => inputRef.current?.focus());
     return () => {
       cancelled = true;
       window.cancelAnimationFrame(focusTimer);
     };
-  }, [post, warmPeople]);
+  }, [post, warmPeople, commentsReloadKey]);
 
   useEffect(() => {
     if (!post || pendingDelete) return undefined;
@@ -152,7 +160,12 @@ export default function CommentsModal() {
           </button>
         </div>
         <div className="comments-modal-list">
-          {comments === null ? (
+          {commentsError ? (
+            <div className="suggestion-empty" role="alert">
+              Couldn't load comments.
+              <button type="button" className="btn btn-ghost" onClick={() => setCommentsReloadKey((key) => key + 1)} style={{ width: "auto", marginTop: 8 }}>Try again</button>
+            </div>
+          ) : comments === null ? (
             <div className="suggestion-empty">Loading comments…</div>
           ) : comments.length === 0 ? (
             <div className="suggestion-empty">No comments yet — be the first to reply</div>

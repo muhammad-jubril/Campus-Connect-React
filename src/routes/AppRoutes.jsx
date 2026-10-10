@@ -18,6 +18,7 @@ import ForgotPasswordPage from "../pages/ForgotPasswordPage";
 import ResetPasswordPage from "../pages/ResetPasswordPage";
 import WelcomePage from "../pages/WelcomePage";
 import FeedPage from "../pages/FeedPage";
+import PostDetailPage from "../pages/PostDetailPage";
 import CreatePostPage from "../pages/CreatePostPage";
 import ProfilePage from "../pages/ProfilePage";
 import EditProfilePage from "../pages/EditProfilePage";
@@ -89,6 +90,7 @@ export default function AppRoutes() {
 
         <Route element={<AppLayout />}>
           <Route path="/feed" element={<FeedPage />} />
+          <Route path="/post/:postId" element={<PostDetailPage />} />
           <Route
             path="/marketplace"
             element={

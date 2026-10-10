@@ -186,6 +186,12 @@
   text-overflow: ellipsis;
 }
 
+/* The desktop rail is present in the component tree but must not consume
+   layout space on mobile. The desktop media query below enables it. */
+.sidebar {
+  display: none;
+}
+
 /* ---------- Mobile bottom navigation ---------- */
 .bottom-nav {
   position: fixed;
