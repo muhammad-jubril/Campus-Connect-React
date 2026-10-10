@@ -9,7 +9,6 @@ import { useToast } from "../hooks/useToast";
 import {
   getPostById,
   likePost,
-  recordPostView,
   unlikePost,
 } from "../services/supabase/posts";
 import {
@@ -45,8 +44,6 @@ export default function PostDetailPage() {
   const [postLoading, setPostLoading] = useState(true);
   const [postError, setPostError] = useState(false);
   const [notFound, setNotFound] = useState(false);
-  const [viewCount, setViewCount] = useState(null);
-  const [viewsUnavailable, setViewsUnavailable] = useState(false);
   const [comments, setComments] = useState(null);
   const [commentsError, setCommentsError] = useState(false);
   const [commentsReloadKey, setCommentsReloadKey] = useState(0);
@@ -68,8 +65,6 @@ export default function PostDetailPage() {
       setPostError(false);
       setNotFound(false);
       setPost(cachedNavigationPost);
-      setViewCount(null);
-      setViewsUnavailable(false);
 
       try {
         const fetchedPost = await getPostById(postId, currentUser?.id || null);
@@ -84,21 +79,10 @@ export default function PostDetailPage() {
         syncPost(fetchedPost);
         warmPeople([fetchedPost.authorUsername]);
 
-        // View tracking is deliberately non-blocking: if the migration has not
-        // been applied yet, the post and its replies still remain usable.
-        recordPostView(postId)
-          .then((count) => {
-            if (active) setViewCount(count);
-          })
-          .catch((error) => {
-            console.error("Record post view failed:", error);
-            if (active) setViewsUnavailable(true);
-          });
       } catch (error) {
         console.error("Load post detail failed:", error);
         if (active && cachedNavigationPost) {
           setPost(cachedNavigationPost);
-          setViewsUnavailable(true);
           warmPeople([cachedNavigationPost.authorUsername]);
         } else if (active) {
           setPostError(true);
@@ -299,43 +283,13 @@ export default function PostDetailPage() {
             onOpenComments={focusComments}
           />
 
-          <div className="post-detail-view-count" aria-live="polite" title="Each signed-in account is counted once per post.">
-            {viewCount !== null ? (
-              <><strong>{viewCount.toLocaleString()}</strong> views <small>· unique signed-in accounts</small></>
-            ) : viewsUnavailable ? (
-              <span>Views are temporarily unavailable.</span>
-            ) : (
-              <span>Counting views…</span>
-            )}
-          </div>
-
           <section className="post-detail-replies" id="comments" ref={commentSectionRef} aria-labelledby="post-detail-replies-title">
             <div className="post-detail-replies-head">
               <h2 className="display" id="post-detail-replies-title">Replies</h2>
               <span>{visiblePost.commentCount} TOTAL</span>
             </div>
 
-            <form className="post-detail-reply-form" onSubmit={handleSubmitComment}>
-              <Avatar person={currentUser} size="sm" />
-              <div className="post-detail-reply-editor">
-                <textarea
-                  ref={commentInputRef}
-                  className="post-textarea"
-                  value={commentText}
-                  maxLength={MAX_COMMENT_LENGTH}
-                  onChange={(event) => setCommentText(event.target.value)}
-                  placeholder="Write a reply…"
-                  aria-label="Write a reply"
-                  disabled={sendingComment}
-                />
-                <div className="post-detail-reply-actions">
-                  <span className="post-detail-char-count">{commentText.length}/{MAX_COMMENT_LENGTH}</span>
-                  <button type="submit" className="btn btn-primary" disabled={!commentText.trim() || sendingComment} style={{ width: "auto", padding: "9px 16px" }}>
-                    {sendingComment ? "Replying…" : "Reply"}
-                  </button>
-                </div>
-              </div>
-            </form>
+
 
             <div className="post-detail-comment-list" aria-live="polite">
               {commentsError ? (
@@ -383,6 +337,28 @@ export default function PostDetailPage() {
                 })
               )}
             </div>
+
+            <form className="post-detail-reply-form" onSubmit={handleSubmitComment}>
+              <Avatar person={currentUser} size="sm" />
+              <div className="post-detail-reply-editor">
+                <textarea
+                  ref={commentInputRef}
+                  className="post-textarea"
+                  value={commentText}
+                  maxLength={MAX_COMMENT_LENGTH}
+                  onChange={(event) => setCommentText(event.target.value)}
+                  placeholder="Post a reply…"
+                  aria-label="Write a reply"
+                  disabled={sendingComment}
+                />
+                <div className="post-detail-reply-actions">
+                  <span className="post-detail-char-count">{commentText.length}/{MAX_COMMENT_LENGTH}</span>
+                  <button type="submit" className="btn btn-primary" disabled={!commentText.trim() || sendingComment} style={{ width: "auto", padding: "9px 16px" }}>
+                    {sendingComment ? "Replying…" : "Reply"}
+                  </button>
+                </div>
+              </div>
+            </form>
           </section>
         </>
       ) : null}

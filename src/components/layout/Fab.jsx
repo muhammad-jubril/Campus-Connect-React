@@ -13,9 +13,21 @@ export default function Fab() {
     const scrollContainer = document.getElementById("app-content-main");
     if (!scrollContainer) return undefined;
 
+    lastScrollTop.current = scrollContainer.scrollTop || 0;
+
     const onScroll = () => {
-      const top = scrollContainer.scrollTop;
-      setHidden(top > lastScrollTop.current && top > 40);
+      const top = Math.max(0, scrollContainer.scrollTop);
+      const delta = top - lastScrollTop.current;
+
+      if (top <= 8) {
+        setHidden(false);
+      } else if (delta > 1) {
+        setHidden(true);
+      } else if (delta < -1) {
+        setHidden(false);
+      }
+
+      // Keep the current visibility when scrolling settles at the same offset.
       lastScrollTop.current = top;
     };
 
@@ -37,7 +49,7 @@ export default function Fab() {
       onClick={() => navigate("/create")}
       aria-label="Create post"
     >
-      <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M12 5v14M5 12h14" /></svg>
+      <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg>
     </button>
   );
 }
