@@ -53,25 +53,24 @@ export default function FeedPage() {
   return (
     <div className="feed-page">
       <div className="feed-sticky-controls">
-      <div className="home-topbar">
-        <MobileMenuButton />
-        <div className="home-title-wrap">
-          <h2 className="display">Campus Feed</h2>
+        <div className="home-topbar">
+          <MobileMenuButton />
+          <div className="home-title-wrap">
+            <h2 className="display">Campus Feed</h2>
+          </div>
+          <button type="button" className="icon-btn" onClick={openChats} aria-label="Chats">
+            <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z" />
+            </svg>
+          </button>
         </div>
-        <button type="button" className="icon-btn" onClick={openChats} aria-label="Chats">
-          <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z" />
-          </svg>
+
+        <button type="button" className="home-search-bar" onClick={() => navigate("/search")} aria-label="Explore campus">
+          <span className="home-search-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round"><circle cx="11" cy="11" r="6.5" /><path d="m16 16 4.5 4.5" /></svg>
+          </span>
+          <span className="home-search-copy">Explore</span>
         </button>
-      </div>
-
-      <button type="button" className="home-search-bar" onClick={() => navigate("/search")} aria-label="Explore">
-        <span className="home-search-icon" aria-hidden="true">
-          <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round"><circle cx="11" cy="11" r="6.5" /><path d="m16 16 4.5 4.5" /></svg>
-        </span>
-        <span className="home-search-copy">Explore</span>
-      </button>
-
       </div>
 
       <div className="home-welcome-card">

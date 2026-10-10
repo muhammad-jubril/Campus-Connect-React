@@ -11,6 +11,7 @@ import "./styles/shell.css";
 import "./styles/shell-pages.css";
 import "./styles/forms.css";
 import "./styles/auth.css";
+import "./styles/desktop-alignment.css";
 
 createRoot(document.getElementById("root")).render(
   <StrictMode>
