@@ -36,13 +36,18 @@ export function onAuthStateChange(callback) {
   return supabase.auth.onAuthStateChange((event, session) => callback(event, session));
 }
 
-// Password-reset links must point at the deployed application's reset route.
-// VITE_SITE_URL is set independently per environment; the fallback keeps the
-// current production deployment working until the variable is configured.
-const DEFAULT_SITE_URL = "https://campus-connect-224y.vercel.app";
-
+// Use VITE_SITE_URL when explicitly configured; otherwise target this exact
+// deployment origin so development and preview builds don't redirect to prod.
 export function getResetRedirectUrl() {
-  const configuredSiteUrl = (import.meta.env.VITE_SITE_URL || DEFAULT_SITE_URL).trim().replace(/\/+$/, "");
+  const currentOrigin = typeof window !== "undefined" ? window.location.origin : "";
+  const configuredSiteUrl = (import.meta.env.VITE_SITE_URL || currentOrigin)
+    .trim()
+    .replace(/\/+$/, "");
+
+  if (!configuredSiteUrl) {
+    throw new Error("Set VITE_SITE_URL to build a password-reset redirect URL outside the browser.");
+  }
+
   return `${configuredSiteUrl}/reset-password`;
 }
 

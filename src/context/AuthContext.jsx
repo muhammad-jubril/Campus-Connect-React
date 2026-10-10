@@ -10,8 +10,8 @@ export const AuthContext = createContext(null);
 const PROFILE_LOAD_TIMEOUT_MS = 10_000;
 
 // Every possible state the app can be in regarding "who is this and are
-// they fully set up" — the routes react to this rather than each doing
-// their own ad-hoc session checks.
+// they fully set up" — the routes react to this rather than each doing their
+// own ad-hoc session checks.
 const STATUS = {
   LOADING: "loading",
   SIGNED_OUT: "signed-out",
@@ -36,6 +36,7 @@ export function AuthProvider({ children }) {
   // there's no `currentUser` shape yet.
   const [pendingAccount, setPendingAccount] = useState(null);
   const handlingRecoveryRef = useRef(false);
+
   function clearSignedOutState() {
     handlingRecoveryRef.current = false;
     setCurrentUser(null);
@@ -167,11 +168,27 @@ export function AuthProvider({ children }) {
     setStatus(STATUS.SIGNED_IN);
   }
 
-  // After a password reset, Supabase's recovery session IS a real signed-in
-  // session — reuse the same resolver instead of forcing another login.
+  // A successful recovery leaves the recovery guard active until this method
+  // resolves the session. Always release it so a later refreshAuth() cannot
+  // return early after setting status to LOADING and strand the app there.
   async function completeRecovery() {
-    const { data } = await getSession();
-    if (data?.session?.user) await resolveSessionUser(data.session.user);
+    const { data, error } = await getSession();
+    handlingRecoveryRef.current = false;
+
+    if (error) {
+      console.error("Recovery session refresh failed:", error);
+      setCurrentUser(null);
+      setPendingAccount(null);
+      setStatus(STATUS.PROFILE_ERROR);
+      throw error;
+    }
+
+    if (data?.session?.user) {
+      await resolveSessionUser(data.session.user);
+      return;
+    }
+
+    clearSignedOutState();
   }
 
   return (
