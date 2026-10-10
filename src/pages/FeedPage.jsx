@@ -65,11 +65,11 @@ export default function FeedPage() {
         </button>
       </div>
 
-      <button type="button" className="home-search-bar" onClick={() => navigate("/search")} aria-label="Search students">
+      <button type="button" className="home-search-bar" onClick={() => navigate("/search")} aria-label="Explore">
         <span className="home-search-icon" aria-hidden="true">
           <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round"><circle cx="11" cy="11" r="6.5" /><path d="m16 16 4.5 4.5" /></svg>
         </span>
-        <span className="home-search-copy">Search students</span>
+        <span className="home-search-copy">Explore</span>
       </button>
 
       </div>

@@ -55,22 +55,22 @@ export default function SearchStudentsPage() {
   }, [query]);
 
   return (
-    <div className="search-page">
-      <div className="search-page-heading">
-        <h2 className="display">Search students</h2>
-        <p className="subtitle">Find students by name or @username.</p>
+    <div className="search-page explore-page">
+      <div className="search-page-heading explore-page-heading">
+        <span className="eyebrow">DISCOVER CAMPUS</span>
+        <h2 className="display">Explore</h2>
+        <p className="subtitle">Find students and discover what’s happening around campus.</p>
       </div>
 
-      <div className="search-input-wrap">
-        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round"><circle cx="11" cy="11" r="6.5" /><path d="m16 16 4.5 4.5" /></svg>
+      <div className="search-input-wrap explore-search-input-wrap">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" aria-hidden="true"><circle cx="11" cy="11" r="6.5" /><path d="m16 16 4.5 4.5" /></svg>
         <input
-          autoFocus
           type="text"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder="Search by name or username"
+          placeholder="Search students by name or username"
           autoComplete="off"
-          aria-label="Search students"
+          aria-label="Search students by name or username"
         />
       </div>
 
@@ -100,13 +100,36 @@ export default function SearchStudentsPage() {
         </div>
       )}
 
-      {!loading && !searched && (
-        <div className="search-state search-empty">
-          <div className="empty-state-icon">
-            <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="7" /><path d="m21 21-4.3-4.3" /></svg>
+      {!searched && (
+        <section className="explore-trending-section" aria-labelledby="explore-trending-title">
+          <div className="explore-trending-heading">
+            <div>
+              <span className="eyebrow">CAMPUS DISCOVERY</span>
+              <h3 id="explore-trending-title" className="display">Trending on campus</h3>
+            </div>
+            <span className="explore-coming-soon">Coming soon</span>
           </div>
-          <p className="subtitle" style={{ marginBottom: 0, maxWidth: 260 }}>Find other NWU students by their name or @username.</p>
-        </div>
+          <div className="explore-trending-card">
+            <span className="explore-trending-mark" aria-hidden="true">↗</span>
+            <div>
+              <h4>What’s happening at NWU?</h4>
+              <p>Trending topics and popular conversations will appear here when real campus activity data is connected.</p>
+            </div>
+          </div>
+        </section>
+      )}
+
+      {searched && !loading && (
+        <section className="explore-trending-section explore-trending-secondary" aria-labelledby="explore-trending-title-after-search">
+          <div className="explore-trending-heading">
+            <div>
+              <span className="eyebrow">CAMPUS DISCOVERY</span>
+              <h3 id="explore-trending-title-after-search" className="display">Trending on campus</h3>
+            </div>
+            <span className="explore-coming-soon">Coming soon</span>
+          </div>
+          <p className="explore-trending-note">Real campus trends will appear here once activity data is available.</p>
+        </section>
       )}
     </div>
   );

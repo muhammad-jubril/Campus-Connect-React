@@ -1,7 +1,6 @@
-import { NavLink, useNavigate } from "react-router-dom";
+import { NavLink } from "react-router-dom";
 import { useAuth } from "../../hooks/useAuth";
 
-const SearchIcon = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round"><circle cx="11" cy="11" r="6.5" /><path d="m16 16 4.5 4.5" /></svg>;
 const PlusIcon = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M12 5v14M5 12h14" /></svg>;
 const GroupsIcon = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" /></svg>;
 const CommunityIcon = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="6" height="6" rx="1" /><rect x="15" y="15" width="6" height="6" rx="1" /><rect x="15" y="3" width="6" height="6" rx="1" /><path d="M9 6h6M18 9v6M15 18H9V9" /></svg>;
@@ -29,7 +28,6 @@ function SidebarPanelLink({ to, panel, activePanel, onOpenPanel, children }) {
 
 export default function Sidebar({ activePanel, onOpenPanel }) {
   const { logout } = useAuth();
-  const navigate = useNavigate();
 
   return (
     <nav className="sidebar" aria-label="Campus sidebar">
@@ -38,10 +36,6 @@ export default function Sidebar({ activePanel, onOpenPanel }) {
         <span>Campus Connect</span>
       </div>
 
-      <button type="button" className="desktop-sidebar-search" onClick={() => navigate("/search")} aria-label="Search students">
-        <span className="desktop-sidebar-search-icon"><SearchIcon /></span>
-        <span><b>Search students</b></span>
-      </button>
 
       <NavLink to="/create" className="sidebar-item sidebar-create">
         <PlusIcon />
