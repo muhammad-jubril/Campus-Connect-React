@@ -6,7 +6,15 @@ import MobileMenuButton from "../components/layout/MobileMenuButton";
 import { usePosts } from "../hooks/usePosts";
 
 export default function FeedPage() {
-  const { posts, postsError, loadPosts } = usePosts();
+  const {
+    posts,
+    postsError,
+    loadPosts,
+    loadMorePosts,
+    hasMorePosts,
+    loadingMorePosts,
+    loadMoreError,
+  } = usePosts();
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
 
@@ -27,6 +35,10 @@ export default function FeedPage() {
     setLoading(true);
     await loadPosts(true);
     setLoading(false);
+  }
+
+  async function handleLoadMore() {
+    await loadMorePosts();
   }
 
   return (
@@ -89,6 +101,38 @@ export default function FeedPage() {
         </div>
       ) : (
         posts.map((post) => <PostCard key={post.id} post={post} />)
+      )}
+
+      {!loading && !postsError && posts.length > 0 && (
+        <div
+          aria-live="polite"
+          style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 10, padding: "8px 0 24px" }}
+        >
+          {loadMoreError && (
+            <p
+              className="subtitle"
+              role="alert"
+              style={{ color: "var(--accent-red)", textAlign: "center", fontSize: 12, marginBottom: 0 }}
+            >
+              We couldn’t load more posts. Check your connection and try again.
+            </p>
+          )}
+          {hasMorePosts ? (
+            <button
+              type="button"
+              className="btn btn-primary"
+              style={{ width: "auto", minWidth: 170, padding: "10px 20px" }}
+              onClick={handleLoadMore}
+              disabled={loadingMorePosts}
+            >
+              {loadingMorePosts ? "Loading more posts…" : loadMoreError ? "Try again" : "Load more posts"}
+            </button>
+          ) : (
+            <p className="subtitle" style={{ fontSize: 11.5, marginBottom: 0 }}>
+              You’re all caught up.
+            </p>
+          )}
+        </div>
       )}
     </div>
   );

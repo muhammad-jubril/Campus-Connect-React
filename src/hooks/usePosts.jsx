@@ -13,11 +13,16 @@ export function PostsProvider({ children }) {
   const [posts, setPosts] = useState([]);
   const [postsOwnerId, setPostsOwnerId] = useState(null);
   const [postsError, setPostsError] = useState(null);
+  const [feedCursor, setFeedCursor] = useState(null);
+  const [hasMorePosts, setHasMorePosts] = useState(false);
+  const [loadingMorePosts, setLoadingMorePosts] = useState(false);
+  const [loadMoreError, setLoadMoreError] = useState(null);
   const [activeCommentsPostId, setActiveCommentsPostId] = useState(null);
   const loadedRef = useRef(false);
   const loadedUserIdRef = useRef(null);
   const loadedScopeRef = useRef(null);
   const loadRequestRef = useRef(0);
+  const loadMoreInFlightRef = useRef(false);
   const cacheEpochRef = useRef(0);
   const lastUserIdRef = useRef(null);
   const commentsTriggerRef = useRef(null);
@@ -37,10 +42,14 @@ export function PostsProvider({ children }) {
     setPosts([]);
     setPostsOwnerId(null);
     setPostsError(null);
+    setFeedCursor(null);
+    setHasMorePosts(false);
+    setLoadingMorePosts(false);
+    setLoadMoreError(null);
+    loadMoreInFlightRef.current = false;
     loadedRef.current = false;
     loadedUserIdRef.current = null;
     loadedScopeRef.current = null;
-    loadRequestRef.current += 1;
     setActiveCommentsPostId(null);
     commentsTriggerRef.current = null;
   }, [currentUserId]);
@@ -50,6 +59,7 @@ export function PostsProvider({ children }) {
     loadedUserIdRef.current = requestUserId;
     loadedScopeRef.current = scope;
     setPostsError(null);
+    setLoadMoreError(null);
     setPosts(rows);
     setPostsOwnerId(requestUserId);
     warmPeople(rows.map((p) => p.authorUsername));
@@ -62,13 +72,18 @@ export function PostsProvider({ children }) {
     if (loadedRef.current && loadedUserIdRef.current === requestUserId && loadedScopeRef.current === scope && !force) return true;
 
     const requestId = ++loadRequestRef.current;
+    loadMoreInFlightRef.current = false;
+    setLoadingMorePosts(false);
+    setLoadMoreError(null);
+    setFeedCursor(null);
+    setHasMorePosts(false);
     setPostsError(null);
     setPosts([]);
     setPostsOwnerId(requestUserId);
 
-    let rows;
+    let page;
     try {
-      rows = await postsApi.fetchPosts(requestUserId);
+      page = await postsApi.fetchFeedPage(null);
     } catch (error) {
       if (
         requestId === loadRequestRef.current &&
@@ -88,7 +103,9 @@ export function PostsProvider({ children }) {
       lastUserIdRef.current !== requestUserId
     ) return false;
 
-    commitLoadedPosts(rows, scope, requestUserId);
+    commitLoadedPosts(page.posts, scope, requestUserId);
+    setFeedCursor(page.nextCursor);
+    setHasMorePosts(page.hasMore);
     return true;
   }, [commitLoadedPosts, currentUserId]);
 
@@ -100,6 +117,11 @@ export function PostsProvider({ children }) {
     if (loadedRef.current && loadedUserIdRef.current === requestUserId && loadedScopeRef.current === scope && !force) return true;
 
     const requestId = ++loadRequestRef.current;
+    loadMoreInFlightRef.current = false;
+    setLoadingMorePosts(false);
+    setLoadMoreError(null);
+    setFeedCursor(null);
+    setHasMorePosts(false);
     setPostsError(null);
     setPosts([]);
     setPostsOwnerId(requestUserId);
@@ -129,6 +151,65 @@ export function PostsProvider({ children }) {
     commitLoadedPosts(rows, scope, requestUserId);
     return true;
   }, [commitLoadedPosts, currentUserId]);
+
+  const loadMorePosts = useCallback(async () => {
+    const requestUserId = currentUserId;
+    const requestEpoch = cacheEpochRef.current;
+    const requestId = loadRequestRef.current;
+
+    if (
+      !hasMorePosts ||
+      !feedCursor ||
+      loadMoreInFlightRef.current ||
+      loadedScopeRef.current !== "feed" ||
+      loadedUserIdRef.current !== requestUserId
+    ) return false;
+
+    loadMoreInFlightRef.current = true;
+    setLoadingMorePosts(true);
+    setLoadMoreError(null);
+
+    try {
+      const page = await postsApi.fetchFeedPage(feedCursor);
+      if (
+        requestId !== loadRequestRef.current ||
+        cacheEpochRef.current !== requestEpoch ||
+        lastUserIdRef.current !== requestUserId ||
+        loadedScopeRef.current !== "feed" ||
+        loadedUserIdRef.current !== requestUserId
+      ) return false;
+
+      setPosts((previous) => {
+        const existingIds = new Set(previous.map((post) => post.id));
+        const additionalPosts = page.posts.filter((post) => !existingIds.has(post.id));
+        return [...previous, ...additionalPosts];
+      });
+      setFeedCursor(page.nextCursor);
+      setHasMorePosts(page.hasMore);
+      setLoadMoreError(null);
+      warmPeople(page.posts.map((post) => post.authorUsername));
+      return true;
+    } catch (error) {
+      if (
+        requestId === loadRequestRef.current &&
+        cacheEpochRef.current === requestEpoch &&
+        lastUserIdRef.current === requestUserId &&
+        loadedScopeRef.current === "feed"
+      ) {
+        setLoadMoreError(error);
+      }
+      return false;
+    } finally {
+      if (
+        requestId === loadRequestRef.current &&
+        cacheEpochRef.current === requestEpoch &&
+        lastUserIdRef.current === requestUserId
+      ) {
+        loadMoreInFlightRef.current = false;
+        setLoadingMorePosts(false);
+      }
+    }
+  }, [currentUserId, feedCursor, hasMorePosts, warmPeople]);
 
   const addPost = useCallback((post) => {
     setPosts((prev) => [post, ...prev]);
@@ -194,6 +275,10 @@ export function PostsProvider({ children }) {
       postsError,
       loadPosts,
       loadPostsByAuthor,
+      loadMorePosts,
+      hasMorePosts,
+      loadingMorePosts,
+      loadMoreError,
       addPost,
       updatePostText,
       removePost,

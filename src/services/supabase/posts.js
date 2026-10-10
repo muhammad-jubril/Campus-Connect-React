@@ -1,5 +1,7 @@
 import { supabase } from "./client";
 
+export const FEED_PAGE_SIZE = 20;
+
 function postRowToPost(row) {
   return {
     id: row.id,
@@ -14,9 +16,36 @@ function postRowToPost(row) {
     },
     createdAt: new Date(row.created_at).getTime(),
     editedAt: row.edited_at ? new Date(row.edited_at).getTime() : null,
-    likes: row.like_count || 0,
+    likes: Number(row.like_count) || 0,
     liked: !!row.liked_by_me,
-    commentCount: row.comment_count || 0,
+    commentCount: Number(row.comment_count) || 0,
+  };
+}
+
+/**
+ * Fetch one feed page through the database keyset-pagination RPC.
+ * The cursor values are the raw timestamp and UUID returned by the RPC;
+ * preserving them avoids precision loss from converting the timestamp to ms.
+ */
+export async function fetchFeedPage(cursor = null) {
+  const { data: postRows, error } = await supabase.rpc("get_feed_posts", {
+    p_limit: FEED_PAGE_SIZE,
+    p_before_created_at: cursor?.createdAt ?? null,
+    p_before_id: cursor?.id ?? null,
+  });
+
+  if (error) throw error;
+  if (!postRows) throw new Error("Feed data unavailable");
+
+  const hasMore = postRows.length === FEED_PAGE_SIZE;
+  const lastRow = postRows[postRows.length - 1];
+
+  return {
+    posts: postRows.map(postRowToPost),
+    nextCursor: hasMore && lastRow
+      ? { createdAt: lastRow.created_at, id: lastRow.id }
+      : null,
+    hasMore,
   };
 }
 
@@ -61,10 +90,6 @@ async function fetchPostsForQuery(currentUserId, authorId = null) {
     liked_by_me: myLikes.has(row.id),
     comment_count: commentCounts[row.id] || 0,
   }));
-}
-
-export async function fetchPosts(currentUserId) {
-  return fetchPostsForQuery(currentUserId);
 }
 
 export async function getPostsByAuthor(authorId, currentUserId) {
