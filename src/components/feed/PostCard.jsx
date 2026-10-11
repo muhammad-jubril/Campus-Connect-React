@@ -10,10 +10,6 @@ import { usePosts } from "../../hooks/usePosts";
 import { useToast } from "../../hooks/useToast";
 import { timeAgo } from "../../utils/timeAgo";
 
-const placeholderMediaSvg = (
-  <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="3" /><circle cx="8.5" cy="8.5" r="1.5" /><path d="m21 15-5-5L5 21" /></svg>
-);
-
 function MediaBlock({ media, onPreview, authorName }) {
   if (!media) return null;
 
