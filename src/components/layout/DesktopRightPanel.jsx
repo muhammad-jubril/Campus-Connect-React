@@ -63,19 +63,19 @@ export default function DesktopRightPanel({ activePanel, onClose }) {
         className={`desktop-right-panel panel-${panelKey}${isOverlayOpen ? " is-open" : ""}`}
         aria-label={`${panel.title} panel`}
       >
+        <button
+          type="button"
+          className="desktop-explore-search"
+          onClick={() => navigate("/search")}
+          aria-label="Search students by name or username"
+        >
+          <SearchIcon />
+          <span>Search students</span>
+          <span className="desktop-explore-search-shortcut" aria-hidden="true">↵</span>
+        </button>
+
         {panelKey === "explore" ? (
           <>
-            <button
-              type="button"
-              className="desktop-explore-search"
-              onClick={() => navigate("/search")}
-              aria-label="Search students by name or username"
-            >
-              <SearchIcon />
-              <span>Search students</span>
-              <span className="desktop-explore-search-shortcut" aria-hidden="true">↵</span>
-            </button>
-
             <header className="desktop-right-panel-head desktop-explore-head">
               <div>
                 <span className="eyebrow">{panel.eyebrow}</span>
