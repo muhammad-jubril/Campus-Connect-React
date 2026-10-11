@@ -80,6 +80,16 @@
   margin: 0 auto;
   padding: 22px 20px 44px;
   box-sizing: border-box;
+  /* Terms and Privacy are standalone routes, outside AppLayout. The app root
+     is intentionally viewport-locked for the feed, so these pages must own
+     their scrolling instead of relying on body/document scrolling. */
+  height: 100dvh;
+  max-height: 100dvh;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-y: contain;
 }
 
 .legal-page > .eyebrow {
@@ -119,7 +129,7 @@
 
 @media (max-width: 767px) {
   .legal-page {
-    padding: 18px 16px calc(112px + env(safe-area-inset-bottom));
+    padding: 18px 16px calc(44px + env(safe-area-inset-bottom));
   }
 
   .signup-consent {

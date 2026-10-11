@@ -12,8 +12,10 @@ import "./styles/shell-pages.css";
 import "./styles/forms.css";
 import "./styles/auth.css";
 // Must follow the legacy shell rules: it aligns the left rail, center navbar,
-// and persistent right Explore rail on desktop widths.
+// and persistent right Explore rail on desktop.
 import "./styles/desktop-alignment.css";
+// Provides the active signup-consent styling and legal-page layout/scroll rules.
+import "./styles/legal-consent.css";
 
 createRoot(document.getElementById("root")).render(
   <StrictMode>
