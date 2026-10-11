@@ -20,15 +20,20 @@ export default function CreatePostPage() {
   const [submitting, setSubmitting] = useState(false);
   const imageInputRef = useRef(null);
   const previewUrlsRef = useRef(new Set());
+  const mountedRef = useRef(true);
   const navigate = useNavigate();
   const { currentUser } = useAuth();
   const { addPost } = usePosts();
   const { runWithLoader } = useLoader();
   const { showToast } = useToast();
 
-  useEffect(() => () => {
-    previewUrlsRef.current.forEach((url) => URL.revokeObjectURL(url));
-    previewUrlsRef.current.clear();
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      previewUrlsRef.current.forEach((url) => URL.revokeObjectURL(url));
+      previewUrlsRef.current.clear();
+    };
   }, []);
 
   async function handleImagesChange(event) {
@@ -63,6 +68,7 @@ export default function CreatePostPage() {
         }
         try {
           const processedFile = await optimizeImage(file, "post");
+          if (!mountedRef.current) break;
           const preview = URL.createObjectURL(processedFile);
           previewUrlsRef.current.add(preview);
           processedImages.push({ file: processedFile, preview, sourceSignature });
@@ -73,6 +79,7 @@ export default function CreatePostPage() {
         }
       }
 
+      if (!mountedRef.current) return;
       setImages((previous) => {
         const capacity = Math.max(0, MAX_IMAGES - previous.length);
         const accepted = processedImages.slice(0, capacity);
@@ -86,7 +93,7 @@ export default function CreatePostPage() {
       if (skippedForLimit) showToast("A post can contain at most four images. Extra selections were skipped.", "error");
       else if (rejectionMessage) showToast(rejectionMessage, "error");
     } finally {
-      setProcessingImages(false);
+      if (mountedRef.current) setProcessingImages(false);
     }
   }
 
@@ -212,7 +219,7 @@ export default function CreatePostPage() {
 
       <div className="spacer" />
       <div className="post-composer-actions">
-        <button type="button" className="btn btn-ghost" onClick={() => navigate(-1)} disabled={submitting}>Cancel</button>
+        <button type="button" className="btn btn-ghost" onClick={() => navigate(-1)} disabled={submitting || processingImages}>Cancel</button>
         <button type="button" className="btn btn-primary" style={{ width: "auto", flex: 1 }} onClick={handleSubmit} disabled={submitting || processingImages}>
           {submitting ? "Posting…" : "Post"}
         </button>
