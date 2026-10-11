@@ -17,6 +17,9 @@ import "./styles/auth.css";
 // Must follow the legacy shell rules: it aligns the left rail, center navbar,
 // and persistent right Explore rail on desktop.
 import "./styles/desktop-alignment.css";
+// Final desktop pass: one continuous canvas across the left rail, center
+// navbar/feed and right Explore rail, with a shared type scale.
+import "./styles/desktop-layout.css";
 // Provides the active signup-consent styling and legal-page layout/scroll rules.
 import "./styles/legal-consent.css";
 

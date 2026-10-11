@@ -1,0 +1,685 @@
+/*
+ * Desktop layout, final pass (imported after desktop-alignment.css).
+ *
+ * Goals
+ *  - One continuous canvas: the left rail, center navbar/feed and right
+ *    Explore rail share the same background. No hard borders between the
+ *    header row and the rails; columns are separated by a faint fading
+ *    hairline instead.
+ *  - One header row: brand, navbar and student search share the same height
+ *    and the same vertical center.
+ *  - One type scale across all three columns:
+ *      eyebrow / labels  11px mono, tracked
+ *      meta              12px
+ *      body              13.5px
+ *      row labels        15px (Sora 600)
+ *      section titles    15px (Sora 600)
+ *      panel title       26px (Sora 700)
+ */
+
+/* Brand block markup is shared with the 768-999px sidebar, so give it sane
+   base styles outside the desktop media query. */
+.sidebar-brand-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  gap: 3px;
+}
+
+.sidebar-brand-text strong {
+  font: 700 16px/1.1 'Sora', 'Inter', sans-serif;
+  letter-spacing: -0.02em;
+  white-space: nowrap;
+}
+
+.sidebar-brand-text small {
+  display: none;
+}
+
+@media (min-width: 1000px) {
+  :root {
+    --cc-desktop-left-rail: 232px;
+    --cc-desktop-right-rail: 260px;
+    --cc-desktop-header-height: 84px;
+    --cc-hairline: rgba(28, 27, 23, 0.085);
+    --cc-rail-pad: 20px;
+  }
+
+  /* ---------- One continuous canvas ---------- */
+  body {
+    background:
+      radial-gradient(900px 520px at 0% 0%, rgba(30, 92, 62, 0.10), transparent 70%),
+      radial-gradient(760px 520px at 100% 100%, rgba(122, 74, 36, 0.08), transparent 70%),
+      var(--bg);
+  }
+
+  .app-shell .sidebar,
+  .app-shell .desktop-right-panel {
+    background: transparent;
+    box-shadow: none;
+    border: 0;
+  }
+
+  /* A fading hairline that starts below the header row, so the columns read
+     as one surface instead of three boxes. */
+  .app-shell .sidebar {
+    border-right: 1px solid transparent;
+    border-image: linear-gradient(to bottom, transparent 0, transparent var(--cc-desktop-header-height), var(--cc-hairline) calc(var(--cc-desktop-header-height) + 90px), var(--cc-hairline) 82%, transparent 100%) 1;
+  }
+
+  .app-shell .desktop-right-panel {
+    flex-direction: column;
+    border-left: 1px solid transparent;
+    border-image: linear-gradient(to bottom, transparent 0, transparent var(--cc-desktop-header-height), var(--cc-hairline) calc(var(--cc-desktop-header-height) + 90px), var(--cc-hairline) 82%, transparent 100%) 1;
+    /* The rail itself never scrolls: the search row and the Explore title
+       stay put and only the Explore content below them scrolls. */
+    padding: 0 var(--cc-rail-pad) 0 !important;
+    overflow-y: hidden;
+  }
+
+  /* ---------- Shared header row ---------- */
+  .app-shell .bottom-nav {
+    padding: 0 20px !important;
+    gap: 6px;
+    background: transparent;
+    border: 0;
+    box-shadow: none;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+
+  .app-shell .bottom-nav-item {
+    position: relative;
+    flex: 1 1 0;
+    max-width: none;
+    height: 52px;
+    gap: 8px;
+    padding: 0 6px;
+    border-radius: 16px;
+    color: rgba(28, 27, 23, 0.62);
+    font: 600 13.5px/1 'Inter', sans-serif;
+    letter-spacing: -0.005em;
+    transition: background 0.18s ease, color 0.18s ease, box-shadow 0.18s ease;
+  }
+
+  .app-shell .bottom-nav-item svg {
+    width: 20px;
+    height: 20px;
+    flex: 0 0 20px;
+  }
+
+  .app-shell .bottom-nav-item:hover {
+    color: var(--ink);
+    background: rgba(28, 27, 23, 0.045);
+  }
+
+  .app-shell .bottom-nav-item.active {
+    color: var(--primary);
+    background: rgba(255, 255, 255, 0.78);
+    box-shadow: 0 1px 0 rgba(255, 255, 255, 0.9) inset, 0 0 0 1px rgba(30, 92, 62, 0.14), 0 6px 16px rgba(30, 92, 62, 0.09);
+  }
+
+  .app-shell .bottom-nav-item .nav-badge {
+    top: 11px;
+    right: 12px;
+    left: auto;
+    box-shadow: 0 0 0 2px var(--bg);
+  }
+
+  /* ---------- Left rail ---------- */
+  .app-shell .sidebar {
+    padding: 0 14px 20px !important;
+  }
+
+  /* Legacy accent stripe along the top of the rail: it cut the rail off from
+     the navbar, so it goes. */
+  .app-shell .sidebar::before {
+    display: none !important;
+  }
+
+  .app-shell .sidebar-brand {
+    gap: 12px;
+    margin: 0 -14px 6px !important;
+    padding: 0 22px !important;
+    background: transparent;
+    border: 0;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+
+  .app-shell .sidebar-brand .brand-dot {
+    width: 44px;
+    height: 44px;
+    flex: 0 0 44px;
+    border-radius: 14px;
+    object-fit: cover;
+    box-shadow: 0 8px 20px rgba(30, 92, 62, 0.26), 0 0 0 3px rgba(255, 255, 255, 0.7);
+  }
+
+  .app-shell .sidebar-brand-text {
+    gap: 4px;
+  }
+
+  .app-shell .sidebar-brand-text strong {
+    font-size: 17px;
+    font-weight: 700;
+  }
+
+  .app-shell .sidebar-brand-text small {
+    display: block;
+    color: rgba(122, 74, 36, 0.85);
+    font: 600 9.5px/1 'IBM Plex Mono', monospace;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+
+  .app-shell .sidebar .sidebar-create {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    width: 100%;
+    height: 54px;
+    min-height: 54px;
+    margin: 6px 0 24px;
+    padding: 0 18px;
+    border-radius: 18px;
+    background: linear-gradient(135deg, #25704a 0%, #1a4d33 100%);
+    color: #fff;
+    font: 700 15.5px/1 'Sora', 'Inter', sans-serif;
+    letter-spacing: -0.005em;
+    box-shadow: 0 12px 26px rgba(30, 92, 62, 0.30), inset 0 1px 0 rgba(255, 255, 255, 0.18);
+    transition: transform 0.18s ease, box-shadow 0.18s ease;
+  }
+
+  .app-shell .sidebar .sidebar-create:hover {
+    background: linear-gradient(135deg, #2a7a52 0%, #1d553a 100%);
+    transform: translateY(-1px);
+    box-shadow: 0 16px 30px rgba(30, 92, 62, 0.34), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  }
+
+  .app-shell .sidebar .sidebar-create svg {
+    width: 20px;
+    height: 20px;
+    flex: 0 0 20px;
+  }
+
+  .app-shell .desktop-sidebar-campus {
+    gap: 4px;
+  }
+
+  .app-shell .desktop-sidebar-section-label {
+    margin: 0 10px 8px;
+    font: 600 11px/1 'IBM Plex Mono', monospace;
+    letter-spacing: 0.16em;
+    color: rgba(28, 27, 23, 0.42);
+  }
+
+  .app-shell .desktop-sidebar-section-label.app-label {
+    margin-top: 24px;
+  }
+
+  .app-shell .desktop-sidebar-link,
+  .app-shell .desktop-sidebar-logout {
+    min-height: 52px;
+    gap: 12px;
+    padding: 6px 10px 6px 8px;
+    border-radius: 16px;
+    transition: background 0.18s ease, box-shadow 0.18s ease;
+  }
+
+  .app-shell .desktop-sidebar-link:hover {
+    background: rgba(255, 255, 255, 0.6);
+    transform: none;
+  }
+
+  .app-shell .desktop-sidebar-link.active {
+    background: rgba(255, 255, 255, 0.82);
+    box-shadow: 0 0 0 1px rgba(30, 92, 62, 0.14), 0 6px 16px rgba(30, 92, 62, 0.08);
+  }
+
+  .app-shell .desktop-sidebar-link-icon,
+  .app-shell .desktop-sidebar-logout-icon {
+    width: 38px;
+    height: 38px;
+    flex: 0 0 38px;
+    border-radius: 12px;
+  }
+
+  .app-shell .desktop-sidebar-link-icon svg,
+  .app-shell .desktop-sidebar-logout-icon svg {
+    width: 20px;
+    height: 20px;
+  }
+
+  .app-shell .desktop-sidebar-link b,
+  .app-shell .desktop-sidebar-logout b {
+    font: 600 15px/1.2 'Sora', 'Inter', sans-serif;
+    letter-spacing: -0.01em;
+  }
+
+  .app-shell .desktop-sidebar-logout {
+    margin-top: 10px;
+    border: 0;
+    border-radius: 16px;
+  }
+
+  .app-shell .desktop-sidebar-logout:hover {
+    background: rgba(178, 58, 46, 0.06);
+    border-radius: 16px;
+  }
+
+  /* ---------- Center column ---------- */
+  .app-shell .app-content-main {
+    padding: 8px 30px 48px;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(28, 27, 23, 0.16) transparent;
+  }
+
+  /* ---------- Right rail: header row + panel title ---------- */
+  .app-shell .desktop-panel-topbar {
+    display: flex;
+    flex: 0 0 var(--cc-desktop-header-height);
+    align-items: center;
+    height: var(--cc-desktop-header-height);
+  }
+
+  .app-shell .desktop-right-panel .desktop-explore-search {
+    flex: 1 1 auto;
+    width: 100%;
+    height: 50px;
+    min-height: 50px;
+    margin: 0 !important;
+    padding: 0 16px;
+    gap: 11px;
+    border: 1px solid rgba(28, 27, 23, 0.08);
+    background: rgba(255, 255, 255, 0.78);
+    color: rgba(28, 27, 23, 0.55);
+    font: 500 13.5px/1 'Inter', sans-serif;
+    box-shadow: 0 1px 0 rgba(255, 255, 255, 0.9) inset, 0 4px 14px rgba(28, 27, 23, 0.04);
+    transition: box-shadow 0.18s ease, color 0.18s ease, background 0.18s ease;
+  }
+
+  .app-shell .desktop-right-panel .desktop-explore-search:hover {
+    background: #fff;
+    color: var(--ink);
+    box-shadow: 0 0 0 1px rgba(30, 92, 62, 0.16), 0 8px 20px rgba(28, 27, 23, 0.07);
+  }
+
+  .app-shell .desktop-right-panel .desktop-explore-search svg {
+    flex: 0 0 auto;
+  }
+
+  .app-shell .desktop-explore-search-shortcut {
+    display: inline-grid;
+    place-items: center;
+    width: 26px;
+    height: 26px;
+    margin-left: auto;
+    border-radius: 8px;
+    background: rgba(28, 27, 23, 0.06);
+    color: rgba(28, 27, 23, 0.5);
+  }
+
+  .app-shell .desktop-right-panel-head {
+    flex: 0 0 auto;
+    margin: 4px 0 18px;
+    padding-bottom: 0;
+    border: 0;
+  }
+
+  .app-shell .desktop-right-panel-head .eyebrow {
+    margin-bottom: 6px;
+    font: 600 11px/1 'IBM Plex Mono', monospace;
+    letter-spacing: 0.16em;
+    color: var(--secondary);
+  }
+
+  .app-shell .desktop-right-panel-head h2 {
+    font: 700 26px/1.15 'Sora', 'Inter', sans-serif;
+    letter-spacing: -0.025em;
+  }
+
+  .app-shell .desktop-right-panel-close {
+    border-color: rgba(28, 27, 23, 0.08);
+  }
+
+  /* ---------- Right rail: overlay panels (Groups, Chats, Settings...) ---------- */
+  .app-shell .desktop-panel-empty {
+    margin-top: 4px;
+    padding: 22px 18px;
+    border-radius: 20px;
+    border-color: rgba(28, 27, 23, 0.07);
+  }
+
+  .app-shell .desktop-panel-empty-mark {
+    width: 52px;
+    height: 52px;
+    border-radius: 16px;
+  }
+
+  .app-shell .desktop-panel-empty h3 {
+    font-size: 15px;
+  }
+
+  .app-shell .desktop-panel-empty p,
+  .app-shell .desktop-panel-settings-note {
+    font-size: 13.5px;
+    line-height: 1.55;
+  }
+
+  .app-shell .desktop-panel-coming-soon {
+    padding: 6px 10px;
+    font-size: 10px;
+    letter-spacing: 0.08em;
+  }
+
+  /* ---------- Explore page ---------- */
+  .explore-body {
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+    gap: 26px;
+    min-height: 0;
+    margin: 0 calc(var(--cc-rail-pad) * -1);
+    padding: 6px var(--cc-rail-pad) 36px;
+    overflow-x: hidden;
+    overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(28, 27, 23, 0.16) transparent;
+    -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 12px);
+    mask-image: linear-gradient(to bottom, transparent 0, #000 12px);
+  }
+
+  /* Settings / empty panels are short, but keep them clear of the bottom edge. */
+  .app-shell .desktop-right-panel .desktop-panel-empty,
+  .app-shell .desktop-right-panel .desktop-panel-settings-list {
+    margin-bottom: 32px;
+  }
+
+  .explore-hero {
+    position: relative;
+    overflow: hidden;
+    padding: 18px 18px 20px;
+    border-radius: 22px;
+    color: #fff;
+    background:
+      radial-gradient(120% 90% at 100% 0%, rgba(255, 255, 255, 0.16), transparent 60%),
+      linear-gradient(150deg, #25704a 0%, #17462f 100%);
+    box-shadow: 0 16px 34px rgba(30, 92, 62, 0.26), inset 0 1px 0 rgba(255, 255, 255, 0.16);
+  }
+
+  .explore-hero-ring {
+    position: absolute;
+    border-radius: 50%;
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    pointer-events: none;
+  }
+
+  .explore-hero-ring-a {
+    width: 150px;
+    height: 150px;
+    right: -46px;
+    top: -52px;
+  }
+
+  .explore-hero-ring-b {
+    width: 92px;
+    height: 92px;
+    right: -22px;
+    top: -30px;
+    border-color: rgba(255, 255, 255, 0.22);
+  }
+
+  .explore-hero-top {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 22px;
+  }
+
+  .explore-hero-icon {
+    display: grid;
+    place-items: center;
+    width: 44px;
+    height: 44px;
+    border-radius: 14px;
+    background: rgba(255, 255, 255, 0.16);
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.2);
+  }
+
+  .explore-soon-pill {
+    padding: 6px 10px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.18);
+    font: 600 10px/1 'IBM Plex Mono', monospace;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+  }
+
+  .explore-hero h3 {
+    position: relative;
+    font: 700 19px/1.2 'Sora', 'Inter', sans-serif;
+    letter-spacing: -0.02em;
+  }
+
+  .explore-hero p {
+    position: relative;
+    margin: 6px 0 0;
+    color: rgba(255, 255, 255, 0.78);
+    font-size: 13.5px;
+    line-height: 1.5;
+  }
+
+  .explore-section-head {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 10px;
+  }
+
+  .explore-section-icon {
+    display: grid;
+    place-items: center;
+    width: 30px;
+    height: 30px;
+    flex: 0 0 30px;
+    border-radius: 10px;
+    background: rgba(30, 92, 62, 0.09);
+    color: var(--primary);
+  }
+
+  .explore-section-head h3 {
+    font: 600 15px/1.2 'Sora', 'Inter', sans-serif;
+    letter-spacing: -0.01em;
+    white-space: nowrap;
+  }
+
+  .explore-section-meta {
+    margin-left: auto;
+    color: rgba(28, 27, 23, 0.42);
+    font: 600 11px/1 'IBM Plex Mono', monospace;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+  }
+
+  .explore-card {
+    padding: 4px 14px;
+    border: 1px solid rgba(28, 27, 23, 0.07);
+    border-radius: 20px;
+    background: rgba(255, 255, 255, 0.72);
+    box-shadow: 0 1px 0 rgba(255, 255, 255, 0.9) inset, 0 6px 18px rgba(28, 27, 23, 0.035);
+  }
+
+  .explore-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 13px 0;
+  }
+
+  .explore-row + .explore-row {
+    border-top: 1px solid rgba(28, 27, 23, 0.06);
+  }
+
+  .explore-row-lines {
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+    gap: 8px;
+    min-width: 0;
+  }
+
+  .explore-line {
+    display: block;
+    height: 10px;
+    border-radius: 999px;
+  }
+
+  .explore-line-a { width: 74%; }
+  .explore-line-b { width: 42%; height: 8px; }
+  .explore-line-c { width: 52%; height: 8px; }
+
+  .explore-rank {
+    width: 16px;
+    height: 16px;
+    flex: 0 0 16px;
+    border-radius: 6px;
+  }
+
+  .explore-count {
+    width: 30px;
+    height: 10px;
+    flex: 0 0 30px;
+    border-radius: 999px;
+  }
+
+  .explore-date {
+    width: 44px;
+    height: 48px;
+    flex: 0 0 44px;
+    border-radius: 14px;
+  }
+
+  .explore-avatar {
+    width: 38px;
+    height: 38px;
+    flex: 0 0 38px;
+    border-radius: 50%;
+  }
+
+  .explore-chip {
+    width: 42px;
+    height: 24px;
+    flex: 0 0 42px;
+    border-radius: 999px;
+  }
+
+  .explore-footer {
+    padding: 2px 4px 0;
+  }
+
+  .explore-footer nav {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .explore-footer a {
+    color: rgba(28, 27, 23, 0.55);
+    font-size: 12.5px;
+    font-weight: 500;
+    text-decoration: none;
+  }
+
+  .explore-footer a:hover {
+    color: var(--primary);
+    text-decoration: underline;
+  }
+
+  .explore-footer-dot {
+    width: 3px;
+    height: 3px;
+    border-radius: 50%;
+    background: rgba(28, 27, 23, 0.28);
+  }
+
+  .explore-footer p {
+    margin: 8px 0 0;
+    color: rgba(28, 27, 23, 0.4);
+    font-size: 12px;
+    line-height: 1.4;
+  }
+}
+
+/* Narrow desktop: stack icon over label so every tab gets an equal slot and a
+   readable label size instead of squeezing text into a thin row. */
+@media (min-width: 1000px) and (max-width: 1199px) {
+  .app-shell .bottom-nav {
+    padding: 0 12px !important;
+    gap: 4px;
+  }
+
+  .app-shell .bottom-nav-item {
+    flex-direction: column;
+    gap: 5px;
+    height: 58px;
+    padding: 0 4px;
+    font-size: 12.5px;
+  }
+
+  .app-shell .bottom-nav-item .nav-badge {
+    top: 8px;
+    right: 14px;
+  }
+
+  .explore-section-meta {
+    display: none;
+  }
+}
+
+/* Wider screens: more room for the navbar labels and the rails. */
+@media (min-width: 1200px) {
+  :root {
+    --cc-desktop-left-rail: 264px;
+    --cc-desktop-right-rail: 320px;
+  }
+
+  .app-shell .bottom-nav {
+    padding: 0 28px !important;
+    gap: 8px;
+  }
+
+  .app-shell .bottom-nav-item {
+    gap: 10px;
+    font-size: 14.5px;
+  }
+
+  .app-shell .bottom-nav-item svg {
+    width: 22px;
+    height: 22px;
+    flex-basis: 22px;
+  }
+
+  .app-shell .app-content-main {
+    padding: 8px 38px 52px;
+  }
+
+  :root {
+    --cc-rail-pad: 24px;
+  }
+}
+
+@media (min-width: 1440px) {
+  .app-shell .bottom-nav-item {
+    font-size: 15px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .explore-body .sk {
+    animation: none;
+  }
+}

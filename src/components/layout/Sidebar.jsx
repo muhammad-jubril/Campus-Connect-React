@@ -33,12 +33,15 @@ export default function Sidebar({ activePanel, onOpenPanel }) {
     <nav className="sidebar" aria-label="Campus sidebar">
       <div className="sidebar-brand">
         <img src="/icons/icon-192.png" alt="" className="brand-dot" />
-        <span>Campus Connect</span>
+        <div className="sidebar-brand-text">
+          <strong>Campus Connect</strong>
+          <small>Northwest University</small>
+        </div>
       </div>
 
       <NavLink to="/create" className="sidebar-item sidebar-create">
         <PlusIcon />
-        Create
+        <span>Create</span>
       </NavLink>
 
       <div className="desktop-sidebar-campus">
