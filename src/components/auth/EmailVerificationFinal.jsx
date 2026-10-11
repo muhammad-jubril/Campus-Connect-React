@@ -12,12 +12,14 @@ import { uploadToStorage } from "../../services/supabase/storage";
 import { useAuth } from "../../hooks/useAuth";
 import { useLoader } from "../../hooks/useLoader";
 import { useToast } from "../../hooks/useToast";
+import { TERMS_VERSION, PRIVACY_VERSION } from "../../utils/legalVersions";
 
 export default function EmailVerificationFinal({
   username,
   password,
   email,
   profileData,
+  termsAccepted = false,
   initialShowOtp = false,
   onVerificationStarted,
   onComplete,
@@ -42,58 +44,42 @@ export default function EmailVerificationFinal({
   }, [initialShowOtp]);
 
   useEffect(() => {
-    if (cooldown <= 0) return;
-
-    const t = setTimeout(() => setCooldown((c) => c - 1), 1000);
-    return () => clearTimeout(t);
+    if (cooldown <= 0) return undefined;
+    const timer = setTimeout(() => setCooldown((seconds) => seconds - 1), 1000);
+    return () => clearTimeout(timer);
   }, [cooldown]);
 
   async function handleSendCode() {
     if (sending) return;
-
     setSending(true);
 
     try {
       if (!username || !password || !email) {
         throw new Error("Your account information is incomplete");
       }
-
-      if (
-        !profileData?.name ||
-        !profileData?.faculty ||
-        !profileData?.department ||
-        !profileData?.level
-      ) {
+      if (!termsAccepted) {
+        throw new Error("Accept the Terms of Use and Privacy Policy before creating your account");
+      }
+      if (!profileData?.name || !profileData?.faculty || !profileData?.department || !profileData?.level) {
         throw new Error("Your profile information is incomplete");
       }
 
       let signupResult;
-
       await runWithLoader("Creating your account…", async () => {
         signupResult = await signUp({ email, password, username });
-
-        if (signupResult.error) {
-          throw signupResult.error;
-        }
+        if (signupResult.error) throw signupResult.error;
       });
 
       const { data } = signupResult;
-
       if (data?.session) {
         await signOut();
-        throw new Error(
-          "Email verification is required before entering Campus Connect"
-        );
+        throw new Error("Email verification is required before entering Campus Connect");
       }
-
       if (!data?.user) {
         throw new Error("Couldn't create your account — please try again");
       }
-
       if (Array.isArray(data.user.identities) && data.user.identities.length === 0) {
-        throw new Error(
-          "An account with that email already exists — try logging in instead"
-        );
+        throw new Error("An account with that email already exists — try logging in instead");
       }
 
       setShowOtp(true);
@@ -101,64 +87,44 @@ export default function EmailVerificationFinal({
       onVerificationStarted?.();
       setDigits(["", "", "", "", "", ""]);
       setTimeout(() => inputRefs.current[0]?.focus(), 100);
-    } catch (err) {
-      console.error("Signup verification email failed:", err);
-      showToast(
-        err?.message || "Couldn't create account — try again",
-        "error"
-      );
+    } catch (error) {
+      console.error("Signup verification email failed:", error);
+      showToast(error?.message || "Couldn't create account — try again", "error");
     } finally {
       setSending(false);
     }
   }
 
-  function updateDigit(i, raw) {
+  function updateDigit(index, raw) {
     const value = raw.replace(/[^0-9]/g, "").slice(-1);
     const next = [...digits];
-    next[i] = value;
+    next[index] = value;
     setDigits(next);
 
-    if (value && i < 5) {
-      inputRefs.current[i + 1]?.focus();
-    }
-
+    if (value && index < 5) inputRefs.current[index + 1]?.focus();
     const code = next.join("");
-    if (code.length === 6 && !checking) {
-      verifyCode(code);
+    if (code.length === 6 && !checking) verifyCode(code);
+  }
+
+  function handleKeyDown(index, event) {
+    if (event.key === "Backspace" && !digits[index] && index > 0) {
+      inputRefs.current[index - 1]?.focus();
     }
   }
 
-  function handleKeyDown(i, e) {
-    if (e.key === "Backspace" && !digits[i] && i > 0) {
-      inputRefs.current[i - 1]?.focus();
-    }
-  }
-
-  function handlePaste(e) {
-    const pasted = e.clipboardData
-      .getData("text")
-      .replace(/[^0-9]/g, "")
-      .slice(0, 6);
-
+  function handlePaste(event) {
+    const pasted = event.clipboardData.getData("text").replace(/[^0-9]/g, "").slice(0, 6);
     if (!pasted) return;
-
-    e.preventDefault();
-
+    event.preventDefault();
     const next = pasted.split("");
     while (next.length < 6) next.push("");
-
     setDigits(next);
-
-    if (pasted.length === 6) {
-      verifyCode(pasted);
-    } else {
-      inputRefs.current[pasted.length]?.focus();
-    }
+    if (pasted.length === 6) verifyCode(pasted);
+    else inputRefs.current[pasted.length]?.focus();
   }
 
   async function verifyCode(code) {
     if (checking) return;
-
     setOtpError("");
     setChecking(true);
 
@@ -168,29 +134,18 @@ export default function EmailVerificationFinal({
 
     try {
       await runWithLoader("Verifying your email…", async () => {
-        const { error: verifyError } = await verifySignupOtp({
-          email,
-          token: code,
-        });
-
+        const { error: verifyError } = await verifySignupOtp({ email, token: code });
         if (verifyError) throw verifyError;
       });
-
-      // From this point onward the OTP has been consumed successfully.
       emailVerified = true;
 
       try {
         const { data: userData, error: userError } = await getUser();
-
         if (userError || !userData?.user) {
-          throw (
-            userError ||
-            new Error("No signed-in user found after verification")
-          );
+          throw userError || new Error("No signed-in user found after verification");
         }
 
         const userId = userData.user.id;
-
         profileRow = {
           id: userId,
           username,
@@ -199,21 +154,20 @@ export default function EmailVerificationFinal({
           department: profileData.department,
           level: profileData.level,
           avatar_url: null,
+          // The database trigger stamps terms_accepted_at; never send a client timestamp.
+          terms_version: TERMS_VERSION,
+          privacy_version: PRIVACY_VERSION,
         };
 
-        // Create the account's profile identity first. The avatar is optional
-        // and must never prevent the profile row from being created.
+        // Create the profile row first. Avatar upload is optional and cannot
+        // prevent the consent record/profile identity from being saved.
         await runWithLoader("Finishing your account…", async () => {
           await createProfile(profileRow);
         });
 
         if (profileData.avatarFile) {
           try {
-            const avatarUrl = await uploadToStorage(
-              "avatars",
-              profileData.avatarFile,
-              userId
-            );
+            const avatarUrl = await uploadToStorage("avatars", profileData.avatarFile, userId);
             await updateProfile(userId, { avatar_url: avatarUrl });
             profileRow = { ...profileRow, avatar_url: avatarUrl };
           } catch (avatarError) {
@@ -225,7 +179,7 @@ export default function EmailVerificationFinal({
         console.error("Profile creation failed after email verification:", profileError);
         throw profileError;
       }
-    } catch (err) {
+    } catch (error) {
       if (emailVerified) {
         setOtpError("");
         setDigits(["", "", "", "", "", ""]);
@@ -234,10 +188,8 @@ export default function EmailVerificationFinal({
         return;
       }
 
-      const msg =
-        err?.message || "Couldn't verify — check the code and try again";
-
-      setOtpError(msg);
+      const message = error?.message || "Couldn't verify — check the code and try again";
+      setOtpError(message);
       setDigits(["", "", "", "", "", ""]);
       inputRefs.current[0]?.focus();
       return;
@@ -256,21 +208,15 @@ export default function EmailVerificationFinal({
 
   async function handleResend() {
     if (cooldown > 0 || checking) return;
-
     setDigits(["", "", "", "", "", ""]);
     setOtpError("");
     inputRefs.current[0]?.focus();
 
     const { error } = await resendSignupOtp(email);
-
     if (error) {
-      showToast(
-        error.message || "Couldn't resend — try again shortly",
-        "error"
-      );
+      showToast(error.message || "Couldn't resend — try again shortly", "error");
       return;
     }
-
     showToast(`New code sent to ${email}`);
     setCooldown(30);
   }
@@ -281,45 +227,28 @@ export default function EmailVerificationFinal({
       await handleSendCode();
       return;
     }
-
     const code = digits.join("");
     if (code.length === 6) {
       await verifyCode(code);
       return;
     }
-
     showToast("Enter the 6-digit code", "error");
   }
 
   return (
     <form className="screen-enter" onSubmit={handleSubmit} noValidate>
-      <BackButton
-        onClick={() => (showOtp ? setShowOtp(false) : onBack())}
-      />
-
+      <BackButton onClick={() => (showOtp ? setShowOtp(false) : onBack())} />
       <div className="eyebrow">STEP 4 OF 4</div>
       <h2 className="display">Verify your email</h2>
-      <p className="subtitle">
-        We'll send a 6-digit code to confirm it's you.
-      </p>
+      <p className="subtitle">We'll send a 6-digit code to confirm it's you.</p>
 
       {!showOtp ? (
         <>
-          <p
-            className="subtitle"
-            style={{ marginTop: -16, marginBottom: 24 }}
-          >
-            A verification code will be sent to {""}
-            <strong>{email}</strong>
+          <p className="subtitle" style={{ marginTop: -16, marginBottom: 24 }}>
+            A verification code will be sent to <strong>{email}</strong>
           </p>
-
           <div className="spacer" />
-
-          <button
-            type="submit"
-            className="btn btn-primary"
-            disabled={sending}
-          >
+          <button type="submit" className="btn btn-primary" disabled={sending}>
             Send code to {email}
           </button>
         </>
@@ -334,27 +263,25 @@ export default function EmailVerificationFinal({
 
           <div className="field">
             <label htmlFor="signup-otp-1">Enter the 6-digit code</label>
-
             <div className={`otp-row ${checking ? "checking" : ""}`}>
-              {digits.map((d, i) => (
+              {digits.map((digit, index) => (
                 <input
-                  key={i}
-                  id={`signup-otp-${i + 1}`}
-                  ref={(el) => (inputRefs.current[i] = el)}
+                  key={index}
+                  id={`signup-otp-${index + 1}`}
+                  ref={(element) => (inputRefs.current[index] = element)}
                   maxLength={1}
                   inputMode="numeric"
-                  autoComplete={i === 0 ? "one-time-code" : "off"}
+                  autoComplete={index === 0 ? "one-time-code" : "off"}
                   className="otp-digit"
-                  value={d}
+                  value={digit}
                   disabled={checking}
-                  aria-label={`Verification code digit ${i + 1}`}
-                  onChange={(e) => updateDigit(i, e.target.value)}
-                  onKeyDown={(e) => handleKeyDown(i, e)}
+                  aria-label={`Verification code digit ${index + 1}`}
+                  onChange={(event) => updateDigit(index, event.target.value)}
+                  onKeyDown={(event) => handleKeyDown(index, event)}
                   onPaste={handlePaste}
                 />
               ))}
             </div>
-
             {otpError && (
               <div className="error" style={{ display: "block" }} role="alert">
                 {otpError}
@@ -370,7 +297,6 @@ export default function EmailVerificationFinal({
           >
             Resend code {cooldown > 0 ? `(${cooldown}s)` : ""}
           </button>
-
           <div className="spacer" />
         </>
       )}

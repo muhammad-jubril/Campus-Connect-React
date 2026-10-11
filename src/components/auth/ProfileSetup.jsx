@@ -1,4 +1,5 @@
 import { useRef, useState } from "react";
+import { Link } from "react-router-dom";
 import BackButton from "../common/BackButton";
 import UsernameField from "../common/UsernameField";
 import FacultyDepartmentPicker from "../common/FacultyDepartmentPicker";
@@ -12,6 +13,7 @@ import { isReservedUsername, USERNAME_RE, joinList } from "../../utils/validatio
 import { checkAvatar, uploadCheckMessage } from "../../utils/uploadChecks";
 import { getUploadErrorMessage } from "../../utils/uploadErrors";
 import { compressImage } from "../../utils/imageCompression";
+import { TERMS_VERSION, PRIVACY_VERSION } from "../../utils/legalVersions";
 
 const MAX_NAME_LENGTH = 60;
 const MAX_AVATAR_DIMENSION = 512;
@@ -37,6 +39,8 @@ export default function ProfileSetup({
   const [faculty, setFaculty] = useState(initial.faculty || "");
   const [department, setDepartment] = useState(initial.department || "");
   const [level, setLevel] = useState(initial.level || "");
+  const [termsAccepted, setTermsAccepted] = useState(false);
+  const [termsError, setTermsError] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
   const fileInputRef = useRef(null);
@@ -47,9 +51,9 @@ export default function ProfileSetup({
   const usernameReserved = isReservedUsername(username);
   const usernameValid = USERNAME_RE.test(username) && !usernameReserved;
 
-  async function handleAvatarChange(e) {
-    const file = e.target.files?.[0];
-    e.target.value = "";
+  async function handleAvatarChange(event) {
+    const file = event.target.files?.[0];
+    event.target.value = "";
     if (!file) return;
 
     const result = checkAvatar(file);
@@ -62,10 +66,10 @@ export default function ProfileSetup({
       const compressedFile = await compressImage(file, MAX_AVATAR_DIMENSION, 0.8);
       setAvatarFile(compressedFile);
       const reader = new FileReader();
-      reader.onload = (ev) => setAvatarPreview(ev.target.result);
+      reader.onload = (loadEvent) => setAvatarPreview(loadEvent.target.result);
       reader.readAsDataURL(compressedFile);
-    } catch (err) {
-      console.error("Avatar image processing failed:", err);
+    } catch (error) {
+      console.error("Avatar image processing failed:", error);
       showToast("That file type isn't supported", "error");
     }
   }
@@ -78,6 +82,12 @@ export default function ProfileSetup({
 
     if (!USERNAME_RE.test(username)) {
       showToast("Enter a valid username to continue", "error");
+      return;
+    }
+
+    if (!termsAccepted) {
+      setTermsError(true);
+      showToast("Agree to the Terms of Use and Privacy Policy to continue", "error");
       return;
     }
 
@@ -111,6 +121,8 @@ export default function ProfileSetup({
         department,
         level,
         avatar_url: null,
+        terms_version: TERMS_VERSION,
+        privacy_version: PRIVACY_VERSION,
       };
 
       await createProfile(profileRow);
@@ -129,16 +141,16 @@ export default function ProfileSetup({
 
       showToast("Profile completed successfully!");
       onComplete?.(profileRow);
-    } catch (err) {
-      console.error("Profile resume failed:", err);
+    } catch (error) {
+      console.error("Profile resume failed:", error);
 
-      if (err?.code === "23505") {
+      if (error?.code === "23505") {
         setUsernameTaken(true);
         return;
       }
 
       showToast(
-        err?.message || "Couldn't finish your profile — try again",
+        error?.message || "Couldn't finish your profile — try again",
         "error"
       );
     } finally {
@@ -161,6 +173,10 @@ export default function ProfileSetup({
     if (!faculty) missing.push("your faculty");
     else if (!department) missing.push("your department");
     if (!level) missing.push("your level");
+    if (isResume && !termsAccepted) {
+      missing.push("your agreement to the Terms of Use and Privacy Policy");
+      setTermsError(true);
+    }
 
     if (missing.length > 0) {
       showToast(`Fill in ${joinList(missing)} to continue`, "error");
@@ -193,11 +209,12 @@ export default function ProfileSetup({
     name.trim() &&
     faculty &&
     department &&
-    level
+    level &&
+    (!isResume || termsAccepted)
   );
 
   return (
-    <form className="screen-enter" onSubmit={handleContinue}>
+    <form className="screen-enter" onSubmit={handleContinue} noValidate>
       {!isResume && <BackButton onClick={onBack} />}
 
       <div className="eyebrow">{isResume ? "FINISH YOUR PROFILE" : "STEP 3 OF 4"}</div>
@@ -240,9 +257,9 @@ export default function ProfileSetup({
         role="button"
         tabIndex={0}
         onClick={() => fileInputRef.current?.click()}
-        onKeyDown={(e) => {
-          if (e.key === "Enter" || e.key === " ") {
-            e.preventDefault();
+        onKeyDown={(event) => {
+          if (event.key === "Enter" || event.key === " ") {
+            event.preventDefault();
             fileInputRef.current?.click();
           }
         }}
@@ -259,7 +276,7 @@ export default function ProfileSetup({
           type="text"
           value={name}
           maxLength={MAX_NAME_LENGTH}
-          onChange={(e) => setName(e.target.value)}
+          onChange={(event) => setName(event.target.value)}
           placeholder="Your name"
           autoComplete="name"
         />
@@ -268,16 +285,16 @@ export default function ProfileSetup({
       <FacultyDepartmentPicker
         faculty={faculty}
         department={department}
-        onChange={({ faculty: f, department: d }) => {
-          setFaculty(f);
-          setDepartment(d);
+        onChange={({ faculty: nextFaculty, department: nextDepartment }) => {
+          setFaculty(nextFaculty);
+          setDepartment(nextDepartment);
         }}
       />
 
       <div className="field">
         <label htmlFor="profile-level">Level</label>
         <div className="select-wrap-full">
-          <select id="profile-level" value={level} onChange={(e) => setLevel(e.target.value)}>
+          <select id="profile-level" value={level} onChange={(event) => setLevel(event.target.value)}>
             <option value="">Select level</option>
             <option>100</option>
             <option>200</option>
@@ -288,6 +305,37 @@ export default function ProfileSetup({
           </select>
         </div>
       </div>
+
+      {isResume && (
+        <div className={`signup-consent profile-resume-consent ${termsError && !termsAccepted ? "has-error" : ""}`}>
+          <input
+            id="resume-legal-consent"
+            type="checkbox"
+            checked={termsAccepted}
+            onChange={(event) => {
+              setTermsAccepted(event.target.checked);
+              setTermsError(false);
+            }}
+            aria-invalid={termsError && !termsAccepted}
+            aria-describedby={termsError && !termsAccepted ? "resume-legal-error" : undefined}
+            required
+          />
+          <div className="signup-consent-copy">
+            <label htmlFor="resume-legal-consent">
+              I agree to the Terms of Use and Privacy Policy.
+            </label>
+            <div className="signup-consent-links">
+              <Link to="/terms" target="_blank" rel="noreferrer">Read Terms</Link>
+              <Link to="/privacy" target="_blank" rel="noreferrer">Read Privacy Policy</Link>
+            </div>
+            {termsError && !termsAccepted && (
+              <p id="resume-legal-error" className="signup-consent-error" role="alert">
+                You must accept both policies to finish your profile.
+              </p>
+            )}
+          </div>
+        </div>
+      )}
 
       <div className="spacer" />
 

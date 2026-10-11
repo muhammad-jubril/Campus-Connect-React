@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import "../styles/legal-consent.css";
 import AuthLayout from "../components/auth/AuthLayout";
 import StepIndicator from "../components/auth/StepIndicator";
 import SignupForm from "../components/auth/SignupForm";
@@ -15,6 +16,7 @@ export default function SignupPage() {
     password: "",
     email: "",
     profileData: null,
+    termsAccepted: false,
     verificationStarted: false,
   });
   const navigate = useNavigate();
@@ -28,9 +30,10 @@ export default function SignupPage() {
         <SignupForm
           initialUsername={data.username}
           initialPassword={data.password}
+          initialTermsAccepted={data.termsAccepted}
           onBack={() => navigate("/")}
-          onNext={(username, password) => {
-            setData((d) => ({ ...d, username, password }));
+          onNext={(username, password, termsAccepted) => {
+            setData((current) => ({ ...current, username, password, termsAccepted }));
             setStep(2);
           }}
         />
@@ -41,7 +44,7 @@ export default function SignupPage() {
           initialEmail={data.email}
           onBack={() => setStep(1)}
           onNext={(email) => {
-            setData((d) => ({ ...d, email }));
+            setData((current) => ({ ...current, email }));
             setStep(3);
           }}
         />
@@ -52,7 +55,7 @@ export default function SignupPage() {
           initialProfileData={data.profileData}
           onBack={() => setStep(2)}
           onNext={(profileData) => {
-            setData((d) => ({ ...d, profileData }));
+            setData((current) => ({ ...current, profileData }));
             setStep(4);
           }}
         />
@@ -64,9 +67,10 @@ export default function SignupPage() {
           password={data.password}
           email={data.email}
           profileData={data.profileData}
+          termsAccepted={data.termsAccepted}
           initialShowOtp={data.verificationStarted}
           onVerificationStarted={() =>
-            setData((d) => ({ ...d, verificationStarted: true }))
+            setData((current) => ({ ...current, verificationStarted: true }))
           }
           onBack={() => setStep(3)}
           onComplete={(profileRow) => {

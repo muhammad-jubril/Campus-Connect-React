@@ -16,6 +16,47 @@ export function resendSignupOtp(email) {
   return supabase.auth.resend({ type: "signup", email });
 }
 
+// Check address availability before the signup flow advances past Step 2.
+// This deliberately returns only the availability boolean; the Edge Function
+// owns normalization, account lookup and server-side rate limiting.
+export async function checkSignupEmail(email) {
+  const normalizedEmail = String(email || "").trim().toLowerCase();
+  const { data, error } = await supabase.functions.invoke("check-signup-email", {
+    body: { email: normalizedEmail },
+  });
+
+  if (!error) {
+    if (typeof data?.available !== "boolean") {
+      const invalidResponse = new Error("Unexpected email-check response");
+      invalidResponse.code = "invalid_response";
+      throw invalidResponse;
+    }
+    return data;
+  }
+
+  let responseBody = null;
+  try {
+    if (error.context && typeof error.context.json === "function") {
+      responseBody = await error.context.json();
+    }
+  } catch {
+    // A network error or non-JSON response has no structured body.
+  }
+
+  const response = error.context;
+  const retryAfterHeader = response?.headers?.get?.("Retry-After");
+  const parsedError = new Error(responseBody?.error || error.message || "Email check failed");
+  parsedError.code = responseBody?.error || (
+    error.name === "FunctionsFetchError" ? "network_error" : "server_error"
+  );
+  parsedError.status = response?.status || 0;
+  parsedError.retryAfterSeconds = Math.max(
+    0,
+    Number(responseBody?.retry_after_seconds ?? retryAfterHeader ?? 0) || 0
+  );
+  throw parsedError;
+}
+
 export function signInWithPassword({ email, password }) {
   return supabase.auth.signInWithPassword({ email, password });
 }

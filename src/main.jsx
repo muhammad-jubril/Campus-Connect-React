@@ -11,6 +11,8 @@ import "./styles/shell.css";
 import "./styles/shell-pages.css";
 import "./styles/forms.css";
 import "./styles/auth.css";
+// Must follow the legacy shell rules: it aligns the left rail, center navbar,
+// and persistent right Explore rail on desktop widths.
 import "./styles/desktop-alignment.css";
 
 createRoot(document.getElementById("root")).render(
