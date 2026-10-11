@@ -1,10 +1,11 @@
--- Applied live on 2026-10-07 (Claude, via Supabase connector). Keep in repo for history.
--- A. least privilege
+-- A. least privilege: the app never touches these tables as anon; nobody needs TRUNCATE/REFERENCES/TRIGGER
 revoke all on public.comments, public.likes, public.marketplace_listings, public.notifications, public.posts, public.profiles from anon;
 revoke truncate, references, trigger on public.comments, public.likes, public.marketplace_listings, public.notifications, public.posts, public.profiles from authenticated;
--- B. trigger function not callable from the API
+
+-- B. trigger function must not be callable from the API
 revoke execute on function public.set_post_edited_at() from public, anon, authenticated;
--- C. RLS performance: auth.uid() evaluated once per query
+
+-- C. RLS performance: evaluate auth.uid() once per query, not per row (same rules, same meaning)
 alter policy profiles_insert_own on public.profiles with check ((select auth.uid()) = id);
 alter policy profiles_update_own on public.profiles using ((select auth.uid()) = id) with check ((select auth.uid()) = id);
 alter policy posts_delete_own on public.posts using ((select auth.uid()) = author_id);
@@ -17,27 +18,37 @@ alter policy listings_insert_own on public.marketplace_listings with check ((sel
 alter policy listings_update_own on public.marketplace_listings using ((select auth.uid()) = seller_id) with check ((select auth.uid()) = seller_id);
 alter policy notifications_select_own on public.notifications using ((select auth.uid()) = recipient_id);
 alter policy notifications_update_own on public.notifications using ((select auth.uid()) = recipient_id) with check ((select auth.uid()) = recipient_id);
--- D. profiles: editable columns only
+
+-- D. profiles: users may edit only these columns (not id, username, created_at)
 revoke update on public.profiles from authenticated;
 grant update (name, faculty, department, level, avatar_url, bio) on public.profiles to authenticated;
--- E. uploaded-file URLs must be in the user's own storage folder
+
+-- E. uploaded-file URLs must point at the user's own folder in this project's storage
 create or replace function public.urls_in_own_folder(urls text[], bucket text, owner uuid)
 returns boolean language sql immutable set search_path = ''
 as $$
   select coalesce(bool_and(u like 'https://annmbmuuiqvutgvvkpet.supabase.co/storage/v1/object/public/' || bucket || '/' || owner::text || '/%'), true)
   from unnest(urls) as u
 $$;
+
+alter table public.posts drop constraint if exists posts_media_urls_own_folder;
 alter table public.posts add constraint posts_media_urls_own_folder
   check (media_urls is null or public.urls_in_own_folder(media_urls, 'post-media', author_id));
+
+alter table public.profiles drop constraint if exists profiles_avatar_url_own_folder;
 alter table public.profiles add constraint profiles_avatar_url_own_folder
   check (avatar_url is null or avatar_url like 'https://annmbmuuiqvutgvvkpet.supabase.co/storage/v1/object/public/avatars/' || id::text || '/%');
+
+alter table public.marketplace_listings drop constraint if exists listings_images_own_folder;
 alter table public.marketplace_listings add constraint listings_images_own_folder
   check (images is null or public.urls_in_own_folder(images, 'post-media', seller_id));
--- F. username_available: strict search_path
+
+-- F. username_available: strict search_path (stays public: signup needs it before login)
 create or replace function public.username_available(p_username text)
 returns boolean language sql security definer set search_path = ''
 as $$
   select not exists (select 1 from public.profiles where lower(username) = lower(p_username))
 $$;
--- G. FK index
+
+-- G. marketplace FK index flagged by the linter
 create index if not exists marketplace_listings_seller_id_idx on public.marketplace_listings (seller_id);
