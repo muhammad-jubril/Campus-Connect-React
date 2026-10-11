@@ -1,4 +1,4 @@
-import { getImageFileType, IMAGE_UPLOAD_PRESETS } from "./imageCompression";
+import { getImageFileType, IMAGE_UPLOAD_PRESETS } from "./imageCompression.js";
 
 const IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
 
