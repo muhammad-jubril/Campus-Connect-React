@@ -1,3 +1,4 @@
+
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import Avatar from "../components/common/Avatar";
@@ -6,7 +7,10 @@ import PostCard from "../components/feed/PostCard";
 import MobileMenuButton from "../components/layout/MobileMenuButton";
 import { useAuth } from "../hooks/useAuth";
 import { usePosts } from "../hooks/usePosts";
-import { getProfileByUsername, personFromProfileRow } from "../services/supabase/profiles";
+import {
+  getProfileByUsername,
+  personFromProfileRow,
+} from "../services/supabase/profiles";
 
 export default function ProfilePage() {
   const { username } = useParams();
@@ -17,6 +21,9 @@ export default function ProfilePage() {
 
   const [person, setPerson] = useState(isOwnProfile ? currentUser : null);
   const [notFound, setNotFound] = useState(false);
+  const [profileError, setProfileError] = useState(false);
+  const [loadingProfile, setLoadingProfile] = useState(!isOwnProfile);
+  const [profileRetryCount, setProfileRetryCount] = useState(0);
   const [loadingPosts, setLoadingPosts] = useState(true);
 
   useEffect(() => {
@@ -25,32 +32,82 @@ export default function ProfilePage() {
     async function loadProfileAndPosts() {
       setLoadingPosts(true);
       setNotFound(false);
+      setProfileError(false);
 
       if (isOwnProfile) {
+        setLoadingProfile(false);
         setPerson(currentUser);
+
         if (!currentUser?.id) {
           if (active) setLoadingPosts(false);
           return;
         }
 
         await loadPostsByAuthor(currentUser.id);
+
         if (active) setLoadingPosts(false);
         return;
       }
 
       setPerson(null);
-      const { profile, error } = await getProfileByUsername(username);
+      setLoadingProfile(true);
+
+      let result;
+
+      try {
+        result = await getProfileByUsername(username);
+      } catch (loadError) {
+        if (!active) return;
+
+        console.error("Failed to load student profile:", loadError);
+        setProfileError(true);
+        setLoadingProfile(false);
+        setLoadingPosts(false);
+        return;
+      }
+
       if (!active) return;
 
-      if (error || !profile) {
+      const { profile, error } = result || {};
+
+      // The profile helper uses .single(). A genuine missing row can
+      // therefore arrive as PGRST116 with details indicating zero rows.
+      const isMissingProfile =
+        !profile &&
+        (
+          !error ||
+          (
+            error.code === "PGRST116" &&
+            /\b0 rows\b/i.test(error.details || "")
+          )
+        );
+
+      if (isMissingProfile) {
         setNotFound(true);
+        setLoadingProfile(false);
+        setLoadingPosts(false);
+        return;
+      }
+
+      // Do not label database, network, or unexpected lookup failures
+      // as a missing student.
+      if (error || !profile) {
+        if (error) {
+          console.error("Failed to load student profile:", error);
+        }
+
+        setProfileError(true);
+        setLoadingProfile(false);
         setLoadingPosts(false);
         return;
       }
 
       const nextPerson = personFromProfileRow(profile);
       setPerson(nextPerson);
+      setLoadingProfile(false);
+
       await loadPostsByAuthor(profile.id);
+
       if (active) setLoadingPosts(false);
     }
 
@@ -59,18 +116,88 @@ export default function ProfilePage() {
     return () => {
       active = false;
     };
-  }, [username, isOwnProfile, currentUser, loadPostsByAuthor]);
+  }, [
+    username,
+    isOwnProfile,
+    currentUser,
+    loadPostsByAuthor,
+    profileRetryCount,
+  ]);
+
+  function handleRetryProfile() {
+    setLoadingProfile(true);
+    setProfileError(false);
+    setNotFound(false);
+    setProfileRetryCount((count) => count + 1);
+  }
 
   async function handleRetryPosts() {
     if (!person?.id) return;
+
     setLoadingPosts(true);
     await loadPostsByAuthor(person.id, true);
     setLoadingPosts(false);
   }
 
-  if (notFound) {
-    return <div className="profile-page"><h2 className="display">Student not found</h2></div>;
+  if (loadingProfile && !person) {
+    return (
+      <div className="profile-page">
+        <div
+          className="empty-state"
+          style={{ paddingTop: 40 }}
+          role="status"
+          aria-live="polite"
+        >
+          <p className="subtitle" style={{ marginBottom: 0 }}>
+            Loading student profile…
+          </p>
+        </div>
+      </div>
+    );
   }
+
+  if (notFound) {
+    return (
+      <div className="profile-page">
+        <h2 className="display">Student not found</h2>
+      </div>
+    );
+  }
+
+  if (profileError) {
+    return (
+      <div className="profile-page">
+        <div
+          className="empty-state"
+          style={{ paddingTop: 40 }}
+          role="alert"
+        >
+          <h2 className="display" style={{ marginBottom: 12 }}>
+            Couldn’t load this profile
+          </h2>
+
+          <p
+            className="subtitle"
+            style={{ marginBottom: 14, maxWidth: 280 }}
+          >
+            We couldn’t load this student’s profile. Check your connection
+            and try again.
+          </p>
+
+          <button
+            type="button"
+            className="btn btn-primary"
+            style={{ width: "auto", padding: "10px 20px" }}
+            onClick={handleRetryProfile}
+            disabled={loadingProfile}
+          >
+            Try again
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   if (!person) return null;
 
   const theirPosts = posts.filter((post) => post.authorId === person.id);
@@ -104,13 +231,33 @@ export default function ProfilePage() {
               </div>
 
               {isOwnProfile && (
-                <button type="button" className="profile-edit-icon" onClick={() => navigate("/profile/edit")} aria-label="Edit profile" title="Edit profile">
-                  <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9" /><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L8 18l-4 1 1-4Z" /></svg>
+                <button
+                  type="button"
+                  className="profile-edit-icon"
+                  onClick={() => navigate("/profile/edit")}
+                  aria-label="Edit profile"
+                  title="Edit profile"
+                >
+                  <svg
+                    viewBox="0 0 24 24"
+                    width="18"
+                    height="18"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.8"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <path d="M12 20h9" />
+                    <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L8 18l-4 1 1-4Z" />
+                  </svg>
                 </button>
               )}
             </div>
 
-            {person.bio && <p className="profile-card-bio">{person.bio}</p>}
+            {person.bio && (
+              <p className="profile-card-bio">{person.bio}</p>
+            )}
 
             <div className="profile-card-meta">
               {person.department || "Department not set"}
@@ -118,30 +265,60 @@ export default function ProfilePage() {
             </div>
 
             {isOwnProfile && (
-              <button type="button" className="profile-edit-btn" onClick={() => navigate("/profile/edit")}>Edit profile</button>
+              <button
+                type="button"
+                className="profile-edit-btn"
+                onClick={() => navigate("/profile/edit")}
+              >
+                Edit profile
+              </button>
             )}
           </div>
         </div>
       </div>
 
       <div className="profile-stats">
-        <div><strong>{theirPosts.length}</strong><span>Posts</span></div>
-        <div><strong>NWU</strong><span>Campus</span></div>
-        <div><strong>{person.level || "—"}</strong><span>Level</span></div>
+        <div>
+          <strong>{theirPosts.length}</strong>
+          <span>Posts</span>
+        </div>
+        <div>
+          <strong>NWU</strong>
+          <span>Campus</span>
+        </div>
+        <div>
+          <strong>{person.level || "—"}</strong>
+          <span>Level</span>
+        </div>
       </div>
 
       <div className="profile-section-head">
-        <h3 className="section-label">{isOwnProfile ? "Your posts" : "Posts"}</h3>
+        <h3 className="section-label">
+          {isOwnProfile ? "Your posts" : "Posts"}
+        </h3>
       </div>
 
       {loadingPosts ? (
         <FeedSkeleton />
       ) : postsError ? (
-        <div className="empty-state" style={{ paddingTop: 24 }} role="alert">
-          <p className="subtitle" style={{ marginBottom: 14, maxWidth: 280 }}>
+        <div
+          className="empty-state"
+          style={{ paddingTop: 24 }}
+          role="alert"
+        >
+          <p
+            className="subtitle"
+            style={{ marginBottom: 14, maxWidth: 280 }}
+          >
             We couldn’t load these posts. Check your connection and try again.
           </p>
-          <button type="button" className="btn btn-primary" style={{ width: "auto", padding: "10px 20px" }} onClick={handleRetryPosts}>
+
+          <button
+            type="button"
+            className="btn btn-primary"
+            style={{ width: "auto", padding: "10px 20px" }}
+            onClick={handleRetryPosts}
+          >
             Try again
           </button>
         </div>
@@ -150,8 +327,16 @@ export default function ProfilePage() {
           <p className="subtitle" style={{ marginBottom: 0 }}>
             {isOwnProfile ? "You haven't posted anything yet." : "No posts yet."}
           </p>
+
           {isOwnProfile && (
-            <button type="button" className="btn btn-primary" style={{ maxWidth: 240 }} onClick={() => navigate("/create")}>Create your first post</button>
+            <button
+              type="button"
+              className="btn btn-primary"
+              style={{ maxWidth: 240 }}
+              onClick={() => navigate("/create")}
+            >
+              Create your first post
+            </button>
           )}
         </div>
       ) : (
