@@ -17,7 +17,7 @@ function MediaBlock({ media, onOpen }) {
   if (!media) return null;
 
   const imgs = media.images || [];
-  const count = Math.min(media.count || imgs.length || 1, 4);
+  const count = Math.min(media.count || imgs.length || 1, Math.max(imgs.length, 1));
   const openFromKeyboard = (event) => {
     if (!onOpen || (event.key !== "Enter" && event.key !== " ")) return;
     event.preventDefault();

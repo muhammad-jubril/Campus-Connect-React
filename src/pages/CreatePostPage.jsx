@@ -44,12 +44,18 @@ export default function CreatePostPage() {
     const filesToProcess = selectedFiles.slice(0, availableSlots);
     const skippedForLimit = selectedFiles.length > availableSlots;
     const processedImages = [];
+    const knownSignatures = new Set(images.map((image) => image.sourceSignature));
     let rejectionMessage = null;
 
     setProcessingImages(true);
     try {
       // Process sequentially to avoid keeping several large decoded images in memory.
       for (const file of filesToProcess) {
+        const sourceSignature = [file.name, file.size, file.lastModified, file.type].join(":");
+        if (knownSignatures.has(sourceSignature)) {
+          rejectionMessage ||= "That image is already attached.";
+          continue;
+        }
         const result = checkPostMedia(file);
         if (!result.ok) {
           rejectionMessage ||= uploadCheckMessage(result, "post");
@@ -59,7 +65,8 @@ export default function CreatePostPage() {
           const processedFile = await optimizeImage(file, "post");
           const preview = URL.createObjectURL(processedFile);
           previewUrlsRef.current.add(preview);
-          processedImages.push({ file: processedFile, preview });
+          processedImages.push({ file: processedFile, preview, sourceSignature });
+          knownSignatures.add(sourceSignature);
         } catch (error) {
           console.error("Post image processing failed:", error);
           rejectionMessage ||= error?.message || "Couldn't optimize that image. Try another JPEG, PNG, or WebP image.";
