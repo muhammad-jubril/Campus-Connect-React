@@ -44,7 +44,7 @@ export default function SignupForm({
 
     if (!termsAccepted) {
       setTermsError(true);
-      showToast("Agree to the Terms of Use and Privacy Policy to continue", "error");
+      showToast("Confirm you are 18 or older and agree to the Terms of Use and Privacy Policy to continue", "error");
       return;
     }
 
@@ -153,7 +153,7 @@ export default function SignupForm({
         />
         <div className="signup-consent-copy">
           <label htmlFor="signup-legal-consent">
-            I agree to the Terms of Use and Privacy Policy.
+            I confirm I am 18 or older and agree to the Terms of Use and Privacy Policy.
           </label>
           <div className="signup-consent-links">
             <Link to="/terms" target="_blank" rel="noreferrer">Read Terms</Link>
@@ -161,7 +161,7 @@ export default function SignupForm({
           </div>
           {termsError && !termsAccepted && (
             <p id="signup-legal-error" className="signup-consent-error" role="alert">
-              You must accept both policies to create an account.
+              You must confirm that you are 18 or older and accept both policies to create an account.
             </p>
           )}
         </div>

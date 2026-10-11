@@ -58,12 +58,10 @@ export default function EmailVerification({ initialEmail, onNext, onBack }) {
         return;
       }
 
-      // This check is a helpful early warning, not the final uniqueness guard.
-      // If the Edge Function is temporarily unavailable, allow the user to
-      // continue; Supabase signUp still handles duplicate addresses at Step 4.
+      // Do not advance to profile setup unless the availability endpoint returns
+      // a trustworthy boolean. The user can retry without losing the entered email.
       console.error("Signup email availability check failed:", error);
-      showToast("We couldn't check that email right now. We'll check again when creating your account.");
-      onNext(normalizedEmail);
+      setAvailabilityError("We couldn't check that email right now. Please try again.");
     } finally {
       setCheckingEmail(false);
     }

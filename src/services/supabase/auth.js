@@ -92,8 +92,14 @@ export function getResetRedirectUrl() {
   return `${configuredSiteUrl}/reset-password`;
 }
 
+// The Supabase "Reset Password" email template must render {{ .Token }} so
+// this request delivers the six-digit recovery code used by the OTP screen.
 export function resetPasswordForEmail(email) {
   return supabase.auth.resetPasswordForEmail(email, { redirectTo: getResetRedirectUrl() });
+}
+
+export function verifyRecoveryOtp({ email, token }) {
+  return supabase.auth.verifyOtp({ email, token, type: "recovery" });
 }
 
 export function updatePassword(password) {

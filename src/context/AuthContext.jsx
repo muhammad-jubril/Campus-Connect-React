@@ -95,6 +95,9 @@ export function AuthProvider({ children }) {
   }
 
   async function refreshAuth() {
+    // Do not reset the recovery screen to LOADING while a recovery session is
+    // intentionally holding the app in PASSWORD_RECOVERY.
+    if (handlingRecoveryRef.current) return;
     setStatus(STATUS.LOADING);
 
     const { data, error } = await getSession();
@@ -137,7 +140,8 @@ export function AuthProvider({ children }) {
 
       // TOKEN_REFRESHED and USER_UPDATED do not change the app's auth status.
       // SIGNED_IN is also intentionally ignored here because login() resolves
-      // the profile exactly once after signInWithPassword() succeeds.
+      // the profile exactly once after signInWithPassword() succeeds. OTP signup
+      // verification calls refreshAuth explicitly after it returns a session.
     });
 
     refreshAuth();
@@ -158,6 +162,15 @@ export function AuthProvider({ children }) {
 
   async function logout() {
     await supabaseSignOut({ scope: "local" });
+  }
+
+  // Explicit entry into recovery after verifying a reset code. This is also
+  // safe when Supabase's PASSWORD_RECOVERY event already fired.
+  function beginRecovery() {
+    handlingRecoveryRef.current = true;
+    setCurrentUser(null);
+    setPendingAccount(null);
+    setStatus(STATUS.PASSWORD_RECOVERY);
   }
 
   // Called once Step 3 (profile setup) actually creates the profiles row —
@@ -200,6 +213,7 @@ export function AuthProvider({ children }) {
         login,
         logout,
         completeSignIn,
+        beginRecovery,
         completeRecovery,
         refreshAuth,
         setCurrentUser,

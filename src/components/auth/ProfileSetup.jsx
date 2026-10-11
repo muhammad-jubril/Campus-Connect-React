@@ -87,7 +87,7 @@ export default function ProfileSetup({
 
     if (!termsAccepted) {
       setTermsError(true);
-      showToast("Agree to the Terms of Use and Privacy Policy to continue", "error");
+      showToast("Confirm you are 18 or older and agree to the Terms of Use and Privacy Policy to continue", "error");
       return;
     }
 
@@ -174,7 +174,7 @@ export default function ProfileSetup({
     else if (!department) missing.push("your department");
     if (!level) missing.push("your level");
     if (isResume && !termsAccepted) {
-      missing.push("your agreement to the Terms of Use and Privacy Policy");
+      missing.push("confirmation that you are 18 or older and agreement to the Terms of Use and Privacy Policy");
       setTermsError(true);
     }
 
@@ -322,7 +322,7 @@ export default function ProfileSetup({
           />
           <div className="signup-consent-copy">
             <label htmlFor="resume-legal-consent">
-              I agree to the Terms of Use and Privacy Policy.
+              I confirm I am 18 or older and agree to the Terms of Use and Privacy Policy.
             </label>
             <div className="signup-consent-links">
               <Link to="/terms" target="_blank" rel="noreferrer">Read Terms</Link>
@@ -330,7 +330,7 @@ export default function ProfileSetup({
             </div>
             {termsError && !termsAccepted && (
               <p id="resume-legal-error" className="signup-consent-error" role="alert">
-                You must accept both policies to finish your profile.
+                You must confirm that you are 18 or older and accept both policies to finish your profile.
               </p>
             )}
           </div>

@@ -8,7 +8,7 @@ import { EMAIL_RE, joinList } from "../../utils/validation";
 
 const AUTH_ERROR_MESSAGES = {
   "invalid-credentials": "Wrong email or password",
-  "email-not-confirmed": "Your email isn't verified yet. Create your account again to get a new code.",
+  "email-not-confirmed": "Your email isn't verified yet. Verify it to finish setting up your account.",
   "rate-limited": "Too many attempts. Wait a few minutes and try again.",
   network: "Can't connect. Check your internet and try again.",
   unknown: "Something went wrong. Please try again.",
@@ -42,7 +42,7 @@ export default function LoginForm() {
     event.preventDefault();
     if (submitting) return;
 
-    const normalizedEmail = email.trim();
+    const normalizedEmail = email.trim().toLowerCase();
     const missing = [];
     if (!EMAIL_RE.test(normalizedEmail)) missing.push("your email");
     if (!password) missing.push("your password");
@@ -93,8 +93,8 @@ export default function LoginForm() {
           id="login-email"
           type="email"
           value={email}
-          onChange={(e) => {
-            setEmail(e.target.value);
+          onChange={(event) => {
+            setEmail(event.target.value);
             setAuthErrorKind("");
           }}
           placeholder="you@example.com"
@@ -132,8 +132,12 @@ export default function LoginForm() {
           }}
         >
           Your email isn't verified yet. {""}
-          <Link to="/signup" style={{ color: "var(--primary)", fontWeight: 600 }}>
-            Create your account again to get a new code.
+          <Link
+            to="/verify-email"
+            state={{ email: email.trim() }}
+            style={{ color: "var(--primary)", fontWeight: 600 }}
+          >
+            Verify email or resend code.
           </Link>
         </p>
       )}
