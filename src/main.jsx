@@ -1,3 +1,6 @@
+// Must stay the first import: it starts listening for the browser's install
+// event before anything else runs, so the event can never be missed.
+import "./utils/pwaInstall";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { BrowserRouter } from "react-router-dom";
