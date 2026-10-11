@@ -100,7 +100,7 @@ function extensionForType(type) {
 
 function nameForType(file, type) {
   const name = typeof file?.name === "string" ? file.name : "image";
-  return \`${name.replace(/\.[^.]+$/, "") || "image"}.${extensionForType(type)}\`;
+  return `${name.replace(/\.[^.]+$/, "") || "image"}.${extensionForType(type)}`;
 }
 
 function makeFile(blob, sourceFile, type = blob.type) {
@@ -174,7 +174,7 @@ export function validateImageInput(file, purpose = "post") {
   if (!file) throw new Error("Choose an image to upload.");
   const label = purpose === "avatar" ? "10" : "15";
   if (file.size > preset.maxInputBytes) {
-    throw new Error(\`That original image is too large. Choose an image under ${label} MB.\`);
+    throw new Error(`That original image is too large. Choose an image under ${label} MB.`);
   }
   const type = getImageFileType(file);
   if (!IMAGE_TYPES.has(type)) {
@@ -191,7 +191,7 @@ export async function validateOptimizedImage(file, purpose = "post") {
     throw new Error("Only processed JPEG, PNG, or WebP images can be uploaded.");
   }
   if (file.size > preset.maxProcessedBytes) {
-    throw new Error(\`The processed image exceeds the ${Math.round(preset.maxProcessedBytes / KIB)} KB limit. Choose another image.\`);
+    throw new Error(`The processed image exceeds the ${Math.round(preset.maxProcessedBytes / KIB)} KB limit. Choose another image.`);
   }
   const actualType = await detectImageType(file);
   if (actualType !== file.type) {
@@ -308,7 +308,7 @@ export async function optimizeImage(file, purpose = "post") {
 
     const maxKb = Math.round(preset.maxProcessedBytes / KIB);
     throw new Error(
-      \`This image couldn't be reduced below ${maxKb} KB. Choose a smaller image and try again.${lastSize === null ? " Image processing failed." : ""}\`,
+      `This image couldn't be reduced below ${maxKb} KB. Choose a smaller image and try again.${lastSize === null ? " Image processing failed." : ""}`,
     );
   } finally {
     decoded.close();

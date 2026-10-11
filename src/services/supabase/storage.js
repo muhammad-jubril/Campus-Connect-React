@@ -12,7 +12,7 @@ function extensionForType(type) {
 
 function uniqueId() {
   if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") return crypto.randomUUID();
-  return \`${Date.now()}-${Math.random().toString(36).slice(2, 12)}\`;
+  return `${Date.now()}-${Math.random().toString(36).slice(2, 12)}`;
 }
 
 async function assertUploadAllowed(bucket, file) {
@@ -31,7 +31,7 @@ async function assertUploadAllowed(bucket, file) {
 export async function uploadToStorage(bucket, file, userId) {
   await assertUploadAllowed(bucket, file);
   if (!userId) throw new Error("Sign in before uploading an image.");
-  const path = \`${userId}/${uniqueId()}.${extensionForType(file.type)}\`;
+  const path = `${userId}/${uniqueId()}.${extensionForType(file.type)}`;
   const { error } = await supabase.storage.from(bucket).upload(path, file, {
     upsert: false,
     contentType: file.type,
@@ -47,7 +47,7 @@ export async function removeUploadedFile(bucket, publicUrl) {
   let pathname;
   try { pathname = new URL(publicUrl).pathname; }
   catch { throw new Error("Cannot identify the uploaded file for cleanup."); }
-  const marker = \`/storage/v1/object/public/${bucket}/\`;
+  const marker = `/storage/v1/object/public/${bucket}/`;
   const index = pathname.indexOf(marker);
   if (index < 0) throw new Error("Cannot identify the uploaded file for cleanup.");
   const path = decodeURIComponent(pathname.slice(index + marker.length));

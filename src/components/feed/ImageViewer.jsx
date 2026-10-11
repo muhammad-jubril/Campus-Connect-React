@@ -27,7 +27,7 @@ export default function ImageViewer({ src, alt, onClose, triggerElement }) {
     // Preserve the feed's scroll position on both desktop and mobile while the
     // full-screen viewer is open. Restore the exact inline styles on dismissal.
     body.style.position = "fixed";
-    body.style.top = \`-${scrollY}px\`;
+    body.style.top = `-${scrollY}px`;
     body.style.left = "0";
     body.style.right = "0";
     body.style.width = "100%";

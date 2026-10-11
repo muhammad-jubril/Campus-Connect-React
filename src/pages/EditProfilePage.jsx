@@ -63,7 +63,7 @@ export default function EditProfilePage() {
     if (!level) missing.push("your level");
 
     if (missing.length > 0) {
-      showToast(\`Fill in ${joinList(missing)} to save\`, "error");
+      showToast(`Fill in ${joinList(missing)} to save`, "error");
       return;
     }
 

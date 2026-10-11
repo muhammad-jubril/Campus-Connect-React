@@ -1,5 +1,6 @@
 import { supabase } from "./client";
 import { removeUploadedFile } from "./storage";
+import { validatePostPayload } from "../../utils/postRules";
 
 export const FEED_PAGE_SIZE = 20;
 
@@ -194,19 +195,15 @@ export async function getPostsByAuthor(authorId, currentUserId) {
 }
 
 export async function createPost({ authorId, authorUsername, text, mediaType, mediaUrls }) {
-  const safeText = typeof text === "string" ? text.trim() : "";
-  const urls = Array.isArray(mediaUrls) ? mediaUrls : [];
-  if (safeText.length > 500) throw new Error("Post text must be 500 characters or fewer.");
-  if (!safeText && urls.length === 0) throw new Error("Write something or add at least one image to post.");
-  if (mediaType === "video") throw new Error("Video uploads aren't supported in the beta.");
-  if (mediaType !== null && mediaType !== "image") throw new Error("This post media type isn't supported.");
-  if (urls.length > 4) throw new Error("A post can contain at most four images.");
-  if (mediaType === "image" && urls.length === 0) throw new Error("Choose at least one image.");
-  if (mediaType !== "image" && urls.length > 0) throw new Error("Post images need a valid media type.");
+  const {
+    text: safeText,
+    mediaType: safeMediaType,
+    mediaUrls: urls,
+  } = validatePostPayload({ text, mediaType, mediaUrls });
 
   const { data: inserted, error } = await supabase
     .from("posts")
-    .insert({ author_id: authorId, text: safeText, media_type: mediaType, media_urls: urls })
+    .insert({ author_id: authorId, text: safeText, media_type: safeMediaType, media_urls: urls })
     .select()
     .single();
   if (error) throw error;

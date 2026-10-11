@@ -31,7 +31,7 @@ function MediaBlock({ media, onPreview, authorName }) {
             controls
             preload="metadata"
             playsInline
-            aria-label={\`Video post by ${authorName}\`}
+            aria-label={`Video post by ${authorName}`}
           />
         </div>
       </div>
@@ -42,18 +42,18 @@ function MediaBlock({ media, onPreview, authorName }) {
   if (images.length === 0) return null;
 
   return (
-    <div className={\`post-card-media count-${images.length}\`}>
+    <div className={`post-card-media count-${images.length}`}>
       {images.map((src, index) => (
         <button
           type="button"
           className="media-block media-block-clickable"
-          key={\`${src}-${index}\`}
+          key={`${src}-${index}`}
           onClick={(event) => {
             event.preventDefault();
             event.stopPropagation();
             onPreview(src, index, event.currentTarget);
           }}
-          aria-label={\`View image ${index + 1} of ${images.length} from ${authorName}'s post\`}
+          aria-label={`View image ${index + 1} of ${images.length} from ${authorName}'s post`}
         >
           <img
             src={src}
@@ -87,14 +87,14 @@ export default function PostCard({
   const author = getPerson(post.authorUsername);
   const isSelf = currentUser && post.authorId === currentUser.id;
   const openPost = openOnClick
-    ? () => navigate(\`/post/${post.id}\`, { state: { post } })
+    ? () => navigate(`/post/${post.id}`, { state: { post } })
     : undefined;
   const closeImageViewer = useCallback(() => setImageViewer(null), []);
 
   function handlePreview(src, index, triggerElement) {
     setImageViewer({
       src,
-      alt: \`Image ${index + 1} from ${author.name || "a student's"} post\`,
+      alt: `Image ${index + 1} from ${author.name || "a student's"} post`,
       triggerElement,
     });
   }
@@ -110,13 +110,13 @@ export default function PostCard({
   }
 
   async function handleShare() {
-    const url = \`${window.location.origin}/post/${encodeURIComponent(post.id)}\`;
+    const url = `${window.location.origin}/post/${encodeURIComponent(post.id)}`;
 
     try {
       if (typeof navigator.share === "function") {
         await navigator.share({
           title: "Campus Connect post",
-          text: post.text?.trim() || \`A post by @${post.authorUsername} on Campus Connect\`,
+          text: post.text?.trim() || `A post by @${post.authorUsername} on Campus Connect`,
           url,
         });
         return;
@@ -148,17 +148,17 @@ export default function PostCard({
       onOpenComments(event.currentTarget);
       return;
     }
-    navigate(\`/post/${post.id}#comments\`, { state: { post } });
+    navigate(`/post/${post.id}#comments`, { state: { post } });
   }
 
   return (
     <>
       <article className="post-card" onClick={handleCardClick}>
-        <div className="post-card-head" onClick={() => navigate(\`/profile/${post.authorUsername}\`)}>
+        <div className="post-card-head" onClick={() => navigate(`/profile/${post.authorUsername}`)}>
           <Avatar person={author} />
           <div>
             <div className="post-card-author">{author.name}{isSelf ? " (You)" : ""}</div>
-            <div className="post-card-sub">{author.department || ""}{author.level ? \` · ${author.level} Level\` : ""}</div>
+            <div className="post-card-sub">{author.department || ""}{author.level ? ` · ${author.level} Level` : ""}</div>
           </div>
           <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 4, flexShrink: 0 }}>
             <div className="post-card-time" style={{ marginLeft: 0 }}>
@@ -181,7 +181,7 @@ export default function PostCard({
           <>
             {post.text && (
               openPost ? (
-                <button type="button" className="post-card-open-text" onClick={openPost} aria-label={\`Open post by ${author.name}\`}>
+                <button type="button" className="post-card-open-text" onClick={openPost} aria-label={`Open post by ${author.name}`}>
                   <span className="post-card-text">{post.text}</span>
                 </button>
               ) : (
@@ -193,18 +193,18 @@ export default function PostCard({
         )}
 
         <div className="post-card-actions">
-          <button type="button" className={\`post-action-btn like-btn ${post.liked ? "liked" : ""} ${justLiked ? "stamp" : ""}\`} onClick={handleLike} aria-label={post.liked ? "Unlike post" : "Like post"}>
+          <button type="button" className={`post-action-btn like-btn ${post.liked ? "liked" : ""} ${justLiked ? "stamp" : ""}`} onClick={handleLike} aria-label={post.liked ? "Unlike post" : "Like post"}>
             <svg viewBox="0 0 24 24" fill={post.liked ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
               <path d="M20.8 8.6c0 4.5-8.8 10.4-8.8 10.4S3.2 13.1 3.2 8.6C3.2 5.9 5.4 4 7.9 4c1.5 0 2.9.8 3.7 2 .8-1.2 2.2-2 3.7-2 2.5 0 4.5 1.9 4.5 4.6z" />
             </svg>
             <span className="like-count">{post.likes}</span>
             {justLiked && (
               <span className="like-burst" aria-hidden="true">
-                {Array.from({ length: 5 }).map((_, i) => <span key={i} style={{ "--ang": \`${i * 72}deg\` }} />)}
+                {Array.from({ length: 5 }).map((_, i) => <span key={i} style={{ "--ang": `${i * 72}deg` }} />)}
               </span>
             )}
           </button>
-          <button type="button" className="post-action-btn comment-btn" onClick={handleOpenComments} aria-label={\`View ${post.commentCount} replies\`}>
+          <button type="button" className="post-action-btn comment-btn" onClick={handleOpenComments} aria-label={`View ${post.commentCount} replies`}>
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" /></svg>
             <span className="comment-count">{post.commentCount}</span>
           </button>

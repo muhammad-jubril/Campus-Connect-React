@@ -9,9 +9,7 @@ import { uploadToStorage, removeUploadedFile } from "../services/supabase/storag
 import { checkPostMedia, uploadCheckMessage } from "../utils/uploadChecks";
 import { getUploadErrorMessage } from "../utils/uploadErrors";
 import { optimizeImage } from "../utils/imageCompression";
-
-const MAX_CHARS = 500;
-const MAX_IMAGES = 4;
+import { MAX_POST_CHARS as MAX_CHARS, MAX_POST_IMAGES as MAX_IMAGES } from "../utils/postRules";
 
 export default function CreatePostPage() {
   const [text, setText] = useState("");

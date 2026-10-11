@@ -52,8 +52,8 @@ test("upload input rejects unsupported types and originals above the source limi
     /Only JPEG, PNG, and WebP/,
   );
   assert.throws(
-    () => validateImageInput(createFile(new Uint8Array(10 * KiB), "large.jpg", "image/jpeg"), "avatar"),
-    /contents don't match|supported JPEG|supported image/,
+    () => validateImageInput({ name: "large.jpg", type: "image/jpeg", size: 11 * 1024 * 1024 }, "avatar"),
+    /original image is too large/,
   );
   assert.throws(
     () => validateImageInput({ name: "big.jpg", type: "image/jpeg", size: 11 * 1024 * 1024 }, "avatar"),
@@ -66,7 +66,7 @@ test("processed image validation rejects oversized output and MIME/signature mis
   assert.equal(await validateOptimizedImage(validSmallJpeg, "avatar"), validSmallJpeg);
 
   const tooLarge = createFile(new Uint8Array(150 * KiB + 1).fill(0), "large.jpg", "image/jpeg");
-  assert.rejects(() => validateOptimizedImage(tooLarge, "avatar"), /exceeds the 150 KB limit/);
+  await assert.rejects(() => validateOptimizedImage(tooLarge, "avatar"), /exceeds the 150 KB limit/);
 
   const mismatched = createFile(pngHeader, "fake.jpg", "image/jpeg");
   await assert.rejects(() => validateOptimizedImage(mismatched, "post"), /don't match/);
@@ -89,4 +89,33 @@ test("animated PNG and WebP are rejected rather than silently flattened", async 
 
 test("the feed upload checks reject videos", () => {
   assert.deepEqual(checkPostMedia({ name: "clip.mp4", size: 1024, type: "video/mp4" }), { ok: false, reason: "video" });
+});
+
+
+import { MAX_POST_CHARS, MAX_POST_IMAGES, validatePostPayload } from "../src/utils/postRules.js";
+
+test("feed post rules allow text-only, image-only, and text-plus-image drafts", () => {
+  assert.deepEqual(validatePostPayload({ text: "Hello campus", mediaType: null, mediaUrls: [] }), {
+    text: "Hello campus", mediaType: null, mediaUrls: [],
+  });
+  assert.deepEqual(validatePostPayload({ text: "", mediaType: "image", mediaUrls: ["a.jpg"] }), {
+    text: "", mediaType: "image", mediaUrls: ["a.jpg"],
+  });
+  assert.deepEqual(validatePostPayload({ text: " Hello ", mediaType: "image", mediaUrls: ["a.jpg"] }), {
+    text: "Hello", mediaType: "image", mediaUrls: ["a.jpg"],
+  });
+});
+
+test("feed post rules enforce the 500-character and four-image limits", () => {
+  assert.equal(MAX_POST_CHARS, 500);
+  assert.equal(MAX_POST_IMAGES, 4);
+  assert.doesNotThrow(() => validatePostPayload({ text: "x".repeat(500), mediaType: null, mediaUrls: [] }));
+  assert.throws(() => validatePostPayload({ text: "x".repeat(501), mediaType: null, mediaUrls: [] }), /500 characters/);
+  assert.doesNotThrow(() => validatePostPayload({ text: "", mediaType: "image", mediaUrls: ["1", "2", "3", "4"] }));
+  assert.throws(() => validatePostPayload({ text: "", mediaType: "image", mediaUrls: ["1", "2", "3", "4", "5"] }), /at most 4 images/);
+});
+
+test("feed post rules reject videos and empty posts", () => {
+  assert.throws(() => validatePostPayload({ text: "x", mediaType: "video", mediaUrls: ["clip.mp4"] }), /Video uploads aren't supported/);
+  assert.throws(() => validatePostPayload({ text: "  ", mediaType: null, mediaUrls: [] }), /at least one image/);
 });
