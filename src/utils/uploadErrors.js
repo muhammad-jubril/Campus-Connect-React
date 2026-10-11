@@ -20,8 +20,8 @@ export function getUploadErrorMessage(error, kind = "post") {
     nestedCode === "Payload too large"
   ) {
     return kind === "avatar"
-      ? "That photo is too large (max 2 MB)"
-      : "That file is too large (max 50 MB)";
+      ? "That processed photo is too large (max 150 KB)"
+      : "That processed feed image is too large (max 350 KB)";
   }
 
   if (
@@ -29,7 +29,7 @@ export function getUploadErrorMessage(error, kind = "post") {
     status === 415 ||
     nestedCode === "invalid_mime_type"
   ) {
-    return "That file type isn't supported";
+    return "That file type isn't supported. Choose a JPEG, PNG, or WebP image.";
   }
 
   return null;

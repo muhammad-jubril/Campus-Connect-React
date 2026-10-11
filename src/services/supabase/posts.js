@@ -1,19 +1,28 @@
 import { supabase } from "./client";
+import { removeUploadedFile } from "./storage";
 
 export const FEED_PAGE_SIZE = 20;
 
 function postRowToPost(row) {
+  let media = null;
+  if (row.media_type === "image") {
+    media = {
+      type: "image",
+      images: row.media_urls || [],
+      count: (row.media_urls || []).length,
+    };
+  } else if (row.media_type === "video") {
+    // Legacy video URLs remain renderable, although new video posts are blocked.
+    const videoUrl = (row.media_urls || [])[0] || null;
+    media = { type: "video", url: videoUrl, dataUrl: videoUrl, images: [], count: 1 };
+  }
+
   return {
     id: row.id,
     authorId: row.author_id,
     authorUsername: row.author_username,
     text: row.text,
-    // Legacy video rows remain stored, but beta clients no longer render video media.
-    media: row.media_type === "image" ? {
-      type: "image",
-      images: row.media_urls || [],
-      count: (row.media_urls || []).length,
-    } : null,
+    media,
     createdAt: new Date(row.created_at).getTime(),
     editedAt: row.edited_at ? new Date(row.edited_at).getTime() : null,
     likes: Number(row.like_count) || 0,
@@ -194,6 +203,7 @@ export async function createPost({ authorId, authorUsername, text, mediaType, me
   if (urls.length > 4) throw new Error("A post can contain at most four images.");
   if (mediaType === "image" && urls.length === 0) throw new Error("Choose at least one image.");
   if (mediaType !== "image" && urls.length > 0) throw new Error("Post images need a valid media type.");
+
   const { data: inserted, error } = await supabase
     .from("posts")
     .insert({ author_id: authorId, text: safeText, media_type: mediaType, media_urls: urls })
@@ -221,8 +231,27 @@ export async function updatePostText(postId, text) {
 }
 
 export async function deletePost(postId) {
+  const { data: existingPost, error: lookupError } = await supabase
+    .from("posts")
+    .select("author_id, media_type, media_urls")
+    .eq("id", postId)
+    .maybeSingle();
+  if (lookupError) throw lookupError;
+  if (!existingPost) throw new Error("Post not found.");
+
   const { error } = await supabase.from("posts").delete().eq("id", postId);
   if (error) throw error;
+
+  if (existingPost.media_type === "image" && Array.isArray(existingPost.media_urls)) {
+    const cleanupResults = await Promise.allSettled(
+      existingPost.media_urls.map((url) => removeUploadedFile("post-media", url)),
+    );
+    if (cleanupResults.some((result) => result.status === "rejected")) {
+      // The database deletion has succeeded. A storage cleanup failure should
+      // not misreport the delete as failed; log it for follow-up instead.
+      console.warn("Post deleted, but one or more media objects could not be removed.");
+    }
+  }
 }
 
 export async function likePost(postId, userId) {
