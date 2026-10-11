@@ -6,15 +6,14 @@ import { useAuth } from "../hooks/useAuth";
 import { useLoader } from "../hooks/useLoader";
 import { useToast } from "../hooks/useToast";
 import { updateProfile } from "../services/supabase/profiles";
-import { uploadToStorage } from "../services/supabase/storage";
+import { uploadToStorage, removeUploadedFile } from "../services/supabase/storage";
 import { joinList } from "../utils/validation";
 import { checkAvatar, uploadCheckMessage } from "../utils/uploadChecks";
 import { getUploadErrorMessage } from "../utils/uploadErrors";
-import { compressImage } from "../utils/imageCompression";
+import { optimizeImage } from "../utils/imageCompression";
 
 const MAX_NAME_LENGTH = 60;
 const MAX_BIO_LENGTH = 160;
-const MAX_AVATAR_DIMENSION = 512;
 
 export default function EditProfilePage() {
   const { currentUser, setCurrentUser } = useAuth();
@@ -43,11 +42,7 @@ export default function EditProfilePage() {
     }
 
     try {
-      const compressedFile = await compressImage(
-        file,
-        MAX_AVATAR_DIMENSION,
-        0.8
-      );
+      const compressedFile = await optimizeImage(file, "avatar");
 
       setAvatarFile(compressedFile);
 
@@ -56,7 +51,7 @@ export default function EditProfilePage() {
       reader.readAsDataURL(compressedFile);
     } catch (err) {
       console.error("Avatar image processing failed:", err);
-      showToast("That file type isn't supported", "error");
+      showToast(err?.message || "Couldn\'t process that photo. Choose a JPEG, PNG, or WebP image.", "error");
     }
   }
 
@@ -75,17 +70,15 @@ export default function EditProfilePage() {
     }
 
     setSubmitting(true);
+    let newlyUploadedAvatarUrl = null;
 
     try {
       await runWithLoader("Saving changes…", async () => {
         let avatarUrl = currentUser.avatarDataUrl || null;
 
         if (avatarFile) {
-          avatarUrl = await uploadToStorage(
-            "avatars",
-            avatarFile,
-            currentUser.id
-          );
+          avatarUrl = await uploadToStorage("avatars", avatarFile, currentUser.id);
+          newlyUploadedAvatarUrl = avatarUrl;
         }
 
         const savedName = name.trim();
@@ -110,11 +103,16 @@ export default function EditProfilePage() {
           level,
           avatarDataUrl: avatarUrl || "",
         }));
+        newlyUploadedAvatarUrl = null;
       });
 
       showToast("Profile updated");
       navigate(-1);
     } catch (err) {
+      if (newlyUploadedAvatarUrl) {
+        try { await removeUploadedFile("avatars", newlyUploadedAvatarUrl); }
+        catch (cleanupError) { console.error("Failed to clean up an unused avatar upload:", cleanupError); }
+      }
       console.error("Profile save failed:", err);
       const friendlyMessage = getUploadErrorMessage(err, "avatar");
 

@@ -8,12 +8,12 @@ function postRowToPost(row) {
     authorId: row.author_id,
     authorUsername: row.author_username,
     text: row.text,
-    media: !row.media_type ? null : {
-      type: row.media_type,
-      images: row.media_type === "image" ? (row.media_urls || []) : [],
-      count: row.media_type === "image" ? (row.media_urls || []).length : 1,
-      dataUrl: row.media_type === "video" ? (row.media_urls || [])[0] : undefined,
-    },
+    // Legacy video rows remain stored, but beta clients no longer render video media.
+    media: row.media_type === "image" ? {
+      type: "image",
+      images: row.media_urls || [],
+      count: (row.media_urls || []).length,
+    } : null,
     createdAt: new Date(row.created_at).getTime(),
     editedAt: row.edited_at ? new Date(row.edited_at).getTime() : null,
     likes: Number(row.like_count) || 0,
@@ -185,9 +185,18 @@ export async function getPostsByAuthor(authorId, currentUserId) {
 }
 
 export async function createPost({ authorId, authorUsername, text, mediaType, mediaUrls }) {
+  const safeText = typeof text === "string" ? text.trim() : "";
+  const urls = Array.isArray(mediaUrls) ? mediaUrls : [];
+  if (safeText.length > 500) throw new Error("Post text must be 500 characters or fewer.");
+  if (!safeText && urls.length === 0) throw new Error("Write something or add at least one image to post.");
+  if (mediaType === "video") throw new Error("Video uploads aren't supported in the beta.");
+  if (mediaType !== null && mediaType !== "image") throw new Error("This post media type isn't supported.");
+  if (urls.length > 4) throw new Error("A post can contain at most four images.");
+  if (mediaType === "image" && urls.length === 0) throw new Error("Choose at least one image.");
+  if (mediaType !== "image" && urls.length > 0) throw new Error("Post images need a valid media type.");
   const { data: inserted, error } = await supabase
     .from("posts")
-    .insert({ author_id: authorId, text, media_type: mediaType, media_urls: mediaUrls })
+    .insert({ author_id: authorId, text: safeText, media_type: mediaType, media_urls: urls })
     .select()
     .single();
   if (error) throw error;
@@ -202,9 +211,11 @@ export async function createPost({ authorId, authorUsername, text, mediaType, me
 }
 
 export async function updatePostText(postId, text) {
+  if (typeof text !== "string" || text.length > 500) throw new Error("Post text must be 500 characters or fewer.");
+  const safeText = text.trim();
   const { error } = await supabase
     .from("posts")
-    .update({ text })
+    .update({ text: safeText })
     .eq("id", postId);
   if (error) throw error;
 }

@@ -8,7 +8,7 @@ import {
   getUser,
 } from "../../services/supabase/auth";
 import { createProfile, updateProfile } from "../../services/supabase/profiles";
-import { uploadToStorage } from "../../services/supabase/storage";
+import { uploadToStorage, removeUploadedFile } from "../../services/supabase/storage";
 import { useAuth } from "../../hooks/useAuth";
 import { useLoader } from "../../hooks/useLoader";
 import { useToast } from "../../hooks/useToast";
@@ -168,8 +168,14 @@ export default function EmailVerificationFinal({
         if (profileData.avatarFile) {
           try {
             const avatarUrl = await uploadToStorage("avatars", profileData.avatarFile, userId);
-            await updateProfile(userId, { avatar_url: avatarUrl });
-            profileRow = { ...profileRow, avatar_url: avatarUrl };
+            try {
+              await updateProfile(userId, { avatar_url: avatarUrl });
+              profileRow = { ...profileRow, avatar_url: avatarUrl };
+            } catch (profileUpdateError) {
+              try { await removeUploadedFile("avatars", avatarUrl); }
+              catch (cleanupError) { console.error("Failed to clean up an unused signup avatar:", cleanupError); }
+              throw profileUpdateError;
+            }
           } catch (avatarError) {
             avatarUploadFailed = true;
             console.error("Avatar upload failed after profile creation:", avatarError);
