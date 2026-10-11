@@ -5,18 +5,17 @@ import UsernameField from "../common/UsernameField";
 import FacultyDepartmentPicker from "../common/FacultyDepartmentPicker";
 import { getUser } from "../../services/supabase/auth";
 import { checkUsernameAvailable, createProfile, updateProfile } from "../../services/supabase/profiles";
-import { uploadToStorage } from "../../services/supabase/storage";
+import { uploadToStorage, removeUploadedFile } from "../../services/supabase/storage";
 import { useAuth } from "../../hooks/useAuth";
 import { useLoader } from "../../hooks/useLoader";
 import { useToast } from "../../hooks/useToast";
 import { isReservedUsername, USERNAME_RE, joinList } from "../../utils/validation";
 import { checkAvatar, uploadCheckMessage } from "../../utils/uploadChecks";
 import { getUploadErrorMessage } from "../../utils/uploadErrors";
-import { compressImage } from "../../utils/imageCompression";
+import { optimizeImage } from "../../utils/imageCompression";
 import { TERMS_VERSION, PRIVACY_VERSION } from "../../utils/legalVersions";
 
 const MAX_NAME_LENGTH = 60;
-const MAX_AVATAR_DIMENSION = 512;
 const RESERVED_USERNAME_MESSAGE = "That username isn't available";
 
 export default function ProfileSetup({
@@ -63,14 +62,14 @@ export default function ProfileSetup({
     }
 
     try {
-      const compressedFile = await compressImage(file, MAX_AVATAR_DIMENSION, 0.8);
+      const compressedFile = await optimizeImage(file, "avatar");
       setAvatarFile(compressedFile);
       const reader = new FileReader();
       reader.onload = (loadEvent) => setAvatarPreview(loadEvent.target.result);
       reader.readAsDataURL(compressedFile);
     } catch (error) {
       console.error("Avatar image processing failed:", error);
-      showToast("That file type isn't supported", "error");
+      showToast(error?.message || "Couldn\'t process that photo. Choose a JPEG, PNG, or WebP image.", "error");
     }
   }
 
@@ -130,8 +129,14 @@ export default function ProfileSetup({
       if (avatarFile) {
         try {
           const avatarUrl = await uploadToStorage("avatars", avatarFile, userId);
-          await updateProfile(userId, { avatar_url: avatarUrl });
-          profileRow.avatar_url = avatarUrl;
+          try {
+            await updateProfile(userId, { avatar_url: avatarUrl });
+            profileRow.avatar_url = avatarUrl;
+          } catch (profileUpdateError) {
+            try { await removeUploadedFile("avatars", avatarUrl); }
+            catch (cleanupError) { console.error("Failed to clean up an unused profile-setup avatar:", cleanupError); }
+            throw profileUpdateError;
+          }
         } catch (avatarError) {
           console.error("Avatar upload failed after resume profile creation:", avatarError);
           const friendlyMessage = getUploadErrorMessage(avatarError, "avatar");

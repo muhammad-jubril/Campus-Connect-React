@@ -16,26 +16,8 @@ const placeholderMediaSvg = (
 function MediaBlock({ media, onOpen }) {
   if (!media) return null;
 
-  if (media.type === "video") {
-    return (
-      <div className="post-card-media count-1">
-        <div
-          className="media-block is-video"
-          onClick={(event) => {
-            if (event.target.closest("video, button, a")) return;
-            onOpen?.();
-          }}
-        >
-          {media.dataUrl
-            ? <video src={media.dataUrl} style={{ width: "100%", height: "100%", objectFit: "cover" }} controls muted playsInline />
-            : placeholderMediaSvg}
-        </div>
-      </div>
-    );
-  }
-
   const imgs = media.images || [];
-  const count = Math.min(media.count || imgs.length || 1, 3);
+  const count = Math.min(media.count || imgs.length || 1, 4);
   const openFromKeyboard = (event) => {
     if (!onOpen || (event.key !== "Enter" && event.key !== " ")) return;
     event.preventDefault();
@@ -54,7 +36,7 @@ function MediaBlock({ media, onOpen }) {
           onClick={onOpen}
           onKeyDown={openFromKeyboard}
         >
-          {imgs[i] ? <img src={imgs[i]} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : placeholderMediaSvg}
+          {imgs[i] ? <img src={imgs[i]} alt="" loading="lazy" decoding="async" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : placeholderMediaSvg}
         </div>
       ))}
     </div>
