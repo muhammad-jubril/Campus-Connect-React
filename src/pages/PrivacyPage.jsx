@@ -1,12 +1,6 @@
-import { useNavigate } from "react-router-dom";
-import BackButton from "../components/common/BackButton";
-
 export default function PrivacyPage() {
-  const navigate = useNavigate();
-
   return (
     <main className="screen-task legal-page" aria-labelledby="privacy-title">
-      <BackButton onClick={() => navigate(-1)} />
       <span className="eyebrow">CAMPUS CONNECT · VERSION 2026-10-11 · v2</span>
       <h1 className="display" id="privacy-title">Privacy Policy</h1>
       <p className="subtitle">Effective date: 11 October 2026</p>
