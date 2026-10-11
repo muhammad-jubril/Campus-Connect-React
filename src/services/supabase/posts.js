@@ -22,6 +22,28 @@ function postRowToPost(row) {
   };
 }
 
+// Author names are deliberately fetched from profiles in a separate query
+// instead of a PostgREST embedded join. That keeps post retrieval independent
+// of cached/discoverable foreign-key relationships (PGRST200). A profile lookup
+// failure must not make the underlying post content disappear; the UI already
+// supports a neutral "unknown" author fallback.
+async function fetchUsernamesById(authorIds) {
+  const ids = [...new Set((authorIds || []).filter(Boolean))];
+  if (ids.length === 0) return new Map();
+
+  const { data, error } = await supabase
+    .from("profiles")
+    .select("id, username")
+    .in("id", ids);
+
+  if (error) {
+    console.warn("Could not resolve post author usernames:", error);
+    return new Map();
+  }
+
+  return new Map((data || []).map((profile) => [profile.id, profile.username || "unknown"]));
+}
+
 /**
  * Fetch one feed page through the database keyset-pagination RPC.
  * The cursor values are the raw timestamp and UUID returned by the RPC;
@@ -52,7 +74,7 @@ export async function fetchFeedPage(cursor = null) {
 async function fetchPostsForQuery(currentUserId, authorId = null) {
   let query = supabase
     .from("posts")
-    .select("id, author_id, text, media_type, media_urls, created_at, edited_at, profiles!posts_author_id_fkey(username)")
+    .select("id, author_id, text, media_type, media_urls, created_at, edited_at")
     .order("created_at", { ascending: false });
 
   if (authorId) query = query.eq("author_id", authorId);
@@ -61,7 +83,9 @@ async function fetchPostsForQuery(currentUserId, authorId = null) {
   if (error) throw error;
   if (!postRows) throw new Error("Post data unavailable");
 
-  const postIds = postRows.map((r) => r.id);
+  const postIds = postRows.map((row) => row.id);
+  const authorUsernamesPromise = fetchUsernamesById(postRows.map((row) => row.author_id));
+
   let likeCounts = {};
   let myLikes = new Set();
   let commentCounts = {};
@@ -74,18 +98,20 @@ async function fetchPostsForQuery(currentUserId, authorId = null) {
     if (likeResult.error) throw likeResult.error;
     if (commentResult.error) throw commentResult.error;
 
-    (likeResult.data || []).forEach((l) => {
-      likeCounts[l.post_id] = (likeCounts[l.post_id] || 0) + 1;
-      if (currentUserId && l.user_id === currentUserId) myLikes.add(l.post_id);
+    (likeResult.data || []).forEach((like) => {
+      likeCounts[like.post_id] = (likeCounts[like.post_id] || 0) + 1;
+      if (currentUserId && like.user_id === currentUserId) myLikes.add(like.post_id);
     });
-    (commentResult.data || []).forEach((c) => {
-      commentCounts[c.post_id] = (commentCounts[c.post_id] || 0) + 1;
+    (commentResult.data || []).forEach((comment) => {
+      commentCounts[comment.post_id] = (commentCounts[comment.post_id] || 0) + 1;
     });
   }
 
+  const authorUsernames = await authorUsernamesPromise;
+
   return postRows.map((row) => postRowToPost({
     ...row,
-    author_username: row.profiles ? row.profiles.username : "unknown",
+    author_username: authorUsernames.get(row.author_id) || "unknown",
     like_count: likeCounts[row.id] || 0,
     liked_by_me: myLikes.has(row.id),
     comment_count: commentCounts[row.id] || 0,
@@ -95,14 +121,14 @@ async function fetchPostsForQuery(currentUserId, authorId = null) {
 export async function getPostById(postId, currentUserId) {
   const { data: row, error } = await supabase
     .from("posts")
-    .select("id, author_id, text, media_type, media_urls, created_at, edited_at, profiles!posts_author_id_fkey(username)")
+    .select("id, author_id, text, media_type, media_urls, created_at, edited_at")
     .eq("id", postId)
     .maybeSingle();
 
   if (error) throw error;
   if (!row) return null;
 
-  const [likesResult, commentsResult, likedResult] = await Promise.all([
+  const [likesResult, commentsResult, likedResult, authorUsernames] = await Promise.all([
     supabase
       .from("likes")
       .select("user_id", { count: "exact", head: true })
@@ -119,6 +145,7 @@ export async function getPostById(postId, currentUserId) {
           .eq("user_id", currentUserId)
           .maybeSingle()
       : Promise.resolve({ data: null, error: null }),
+    fetchUsernamesById([row.author_id]),
   ]);
 
   if (likesResult.error) throw likesResult.error;
@@ -127,7 +154,7 @@ export async function getPostById(postId, currentUserId) {
 
   return postRowToPost({
     ...row,
-    author_username: row.profiles ? row.profiles.username : "unknown",
+    author_username: authorUsernames.get(row.author_id) || "unknown",
     like_count: likesResult.count || 0,
     liked_by_me: !!likedResult.data,
     comment_count: commentsResult.count || 0,

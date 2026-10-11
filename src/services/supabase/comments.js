@@ -1,20 +1,40 @@
 import { supabase } from "./client";
 
 export async function fetchCommentsFor(postId) {
+  // Keep the reply query independent of embedded profile relationships. If
+  // PostgREST's relationship cache is stale (PGRST200), reply text can still
+  // load while author names are resolved separately below.
   const { data, error } = await supabase
     .from("comments")
-    .select("id, post_id, author_id, text, created_at, profiles!comments_author_id_fkey(username)")
+    .select("id, post_id, author_id, text, created_at")
     .eq("post_id", postId)
     .order("created_at", { ascending: true });
 
   if (error) throw error;
   if (!data) throw new Error("Replies unavailable");
 
+  const authorIds = [...new Set(data.map((row) => row.author_id).filter(Boolean))];
+  let usernamesById = new Map();
+
+  if (authorIds.length > 0) {
+    const { data: profiles, error: profilesError } = await supabase
+      .from("profiles")
+      .select("id, username")
+      .in("id", authorIds);
+
+    if (profilesError) {
+      // Profile metadata is not required to preserve the reply itself.
+      console.warn("Could not resolve reply author usernames:", profilesError);
+    } else {
+      usernamesById = new Map((profiles || []).map((profile) => [profile.id, profile.username || "unknown"]));
+    }
+  }
+
   return data.map((row) => ({
     id: row.id,
     postId: row.post_id,
     authorId: row.author_id,
-    authorUsername: row.profiles ? row.profiles.username : "unknown",
+    authorUsername: usernamesById.get(row.author_id) || "unknown",
     text: row.text,
     createdAt: new Date(row.created_at).getTime(),
   }));
