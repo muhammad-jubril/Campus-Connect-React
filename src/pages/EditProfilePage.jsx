@@ -1,4 +1,3 @@
-
 import { useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import FacultyDepartmentPicker from "../components/common/FacultyDepartmentPicker";
@@ -43,7 +42,6 @@ export default function EditProfilePage() {
 
     try {
       const compressedFile = await optimizeImage(file, "avatar");
-
       setAvatarFile(compressedFile);
 
       const reader = new FileReader();
@@ -51,7 +49,7 @@ export default function EditProfilePage() {
       reader.readAsDataURL(compressedFile);
     } catch (err) {
       console.error("Avatar image processing failed:", err);
-      showToast(err?.message || "Couldn\'t process that photo. Choose a JPEG, PNG, or WebP image.", "error");
+      showToast(err?.message || "Couldn't process that photo. Choose a JPEG, PNG, or WebP image.", "error");
     }
   }
 
@@ -71,10 +69,11 @@ export default function EditProfilePage() {
 
     setSubmitting(true);
     let newlyUploadedAvatarUrl = null;
+    const previousAvatarUrl = currentUser.avatarDataUrl || "";
 
     try {
       await runWithLoader("Saving changes…", async () => {
-        let avatarUrl = currentUser.avatarDataUrl || null;
+        let avatarUrl = previousAvatarUrl || null;
 
         if (avatarFile) {
           avatarUrl = await uploadToStorage("avatars", avatarFile, currentUser.id);
@@ -104,6 +103,21 @@ export default function EditProfilePage() {
           avatarDataUrl: avatarUrl || "",
         }));
         newlyUploadedAvatarUrl = null;
+
+        // Best-effort cleanup only after the database points to the replacement.
+        // Ignore non-Supabase URLs (or already-missing legacy objects).
+        if (
+          avatarFile &&
+          previousAvatarUrl &&
+          previousAvatarUrl !== avatarUrl &&
+          previousAvatarUrl.includes("/storage/v1/object/public/avatars/")
+        ) {
+          try {
+            await removeUploadedFile("avatars", previousAvatarUrl);
+          } catch (cleanupError) {
+            console.error("Profile saved, but the previous avatar could not be removed:", cleanupError);
+          }
+        }
       });
 
       showToast("Profile updated");

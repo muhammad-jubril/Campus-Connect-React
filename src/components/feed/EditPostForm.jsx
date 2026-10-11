@@ -1,8 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { usePosts } from "../../hooks/usePosts";
 import { useToast } from "../../hooks/useToast";
-
-const MAX_CHARS = 500;
+import { MAX_POST_CHARS as MAX_CHARS } from "../../utils/postRules";
 
 export default function EditPostForm({ post, onCancel, onSaved }) {
   const [value, setValue] = useState(post.text || "");

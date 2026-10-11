@@ -9,7 +9,7 @@ permissions:
 
 jobs:
   quality:
-    name: Lint and build
+    name: Lint, tests, build, and source ZIP
     runs-on: ubuntu-latest
     steps:
       - name: Check out repository
@@ -24,6 +24,9 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Unit tests
+        run: npm test
+
       - name: Lint
         run: npm run lint
 
@@ -37,3 +40,28 @@ jobs:
             echo "Merge conflict markers found in src/."
             exit 1
           fi
+
+      - name: Package source ZIP without dependencies, build output, or local secrets
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf packaged-source campus-connect-beta.zip
+          mkdir -p packaged-source
+          while IFS= read -r -d '' path; do
+            case "$path" in
+              .env|*/.env|.env.local|*/.env.local|.env.development.local|*/.env.development.local|.env.production|*/.env.production|.env.test.local|*/.env.test.local|.env.production.local|*/.env.production.local|*.pem|*.key|*.p12|*.pfx|*service_role*|*service-role*)
+                continue
+                ;;
+            esac
+            mkdir -p "packaged-source/$(dirname "$path")"
+            cp "$path" "packaged-source/$path"
+          done < <(git ls-files -z)
+          (cd packaged-source && zip -qr ../campus-connect-beta.zip .)
+
+      - name: Upload source ZIP artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: campus-connect-beta-source
+          path: campus-connect-beta.zip
+          if-no-files-found: error
+          retention-days: 7

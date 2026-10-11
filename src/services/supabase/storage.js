@@ -1,11 +1,10 @@
 import { supabase } from "./client";
-import { detectImageType } from "../../utils/imageCompression";
+import { IMAGE_UPLOAD_PRESETS, validateOptimizedImage } from "../../utils/imageCompression";
 
-const IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
-const BUCKET_RULES = {
-  avatars: { maxBytes: Math.floor(1.5 * 1024 * 1024) },
-  "post-media": { maxBytes: 4 * 1024 * 1024 },
-};
+const BUCKET_PURPOSES = Object.freeze({
+  avatars: "avatar",
+  "post-media": "post",
+});
 
 function extensionForType(type) {
   return type === "image/jpeg" ? "jpg" : type === "image/png" ? "png" : "webp";
@@ -17,19 +16,15 @@ function uniqueId() {
 }
 
 async function assertUploadAllowed(bucket, file) {
-  const rules = BUCKET_RULES[bucket];
-  if (!rules) throw new Error("Uploads to this storage bucket aren't supported here.");
-  if (!file || !IMAGE_TYPES.has(file.type)) {
-    throw new Error("Only processed JPEG, PNG, or WebP images can be uploaded.");
-  }
-  if (file.size > rules.maxBytes) {
+  const purpose = BUCKET_PURPOSES[bucket];
+  if (!purpose) throw new Error("Uploads to this storage bucket aren't supported here.");
+  await validateOptimizedImage(file, purpose);
+
+  const limit = IMAGE_UPLOAD_PRESETS[purpose].maxProcessedBytes;
+  if (file.size > limit) {
     throw new Error(bucket === "avatars"
-      ? "The processed profile photo exceeds the 1.5 MB upload limit."
-      : "The processed image exceeds the 4 MB upload limit.");
-  }
-  const actualType = await detectImageType(file);
-  if (actualType !== file.type) {
-    throw new Error("The file contents don't match the image format. Choose a valid JPEG, PNG, or WebP image.");
+      ? "The processed profile photo exceeds the 150 KB upload limit."
+      : "The processed feed image exceeds the 350 KB upload limit.");
   }
 }
 
@@ -48,7 +43,7 @@ export async function uploadToStorage(bucket, file, userId) {
 }
 
 export async function removeUploadedFile(bucket, publicUrl) {
-  if (!BUCKET_RULES[bucket] || typeof publicUrl !== "string") return;
+  if (!BUCKET_PURPOSES[bucket] || typeof publicUrl !== "string") return;
   let pathname;
   try { pathname = new URL(publicUrl).pathname; }
   catch { throw new Error("Cannot identify the uploaded file for cleanup."); }
