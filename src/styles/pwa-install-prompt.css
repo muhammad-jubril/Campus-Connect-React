@@ -1,0 +1,141 @@
+/* Campus Connect install banner, matching the vanilla app's bottom placement. */
+.pwa-install-prompt {
+  position: fixed;
+  z-index: 90;
+  left: 12px;
+  right: 12px;
+  bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: auto;
+  max-width: 420px;
+  margin: 0 auto;
+  padding: 14px 14px 14px 12px;
+  border: 1px solid rgba(28, 27, 23, 0.035);
+  border-radius: 4px 18px 18px 18px;
+  background: #fff;
+  color: #262721;
+  box-shadow: 0 12px 32px rgba(28, 27, 23, 0.22);
+  font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  text-align: left;
+}
+
+.pwa-install-icon {
+  display: block;
+  width: 32px;
+  height: 32px;
+  flex: 0 0 32px;
+  border-radius: 8px;
+  object-fit: cover;
+}
+
+.pwa-install-copy {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.pwa-install-copy strong {
+  display: block;
+  margin: 0;
+  color: #292a26;
+  font-family: Sora, Inter, system-ui, sans-serif;
+  font-size: 13.5px;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.pwa-install-copy p {
+  margin: 2px 0 0;
+  color: rgba(28, 27, 23, 0.55);
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 1.4;
+}
+
+.pwa-install-action {
+  flex: 0 0 auto;
+  min-height: 36px;
+  padding: 9px 16px;
+  border: 0;
+  border-radius: 14px;
+  background: #1e5c3e;
+  color: #fff;
+  box-shadow: 0 4px 10px rgba(30, 92, 62, 0.22);
+  cursor: pointer;
+  font: inherit;
+  font-size: 13.5px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.pwa-install-action:hover:not(:disabled) {
+  background: #174a31;
+}
+
+.pwa-install-action:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+  box-shadow: none;
+}
+
+.pwa-install-action:focus-visible,
+.pwa-install-dismiss:focus-visible {
+  outline: 2px solid #1e5c3e;
+  outline-offset: 3px;
+}
+
+.pwa-install-dismiss {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 26px;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: rgba(28, 27, 23, 0.06);
+  color: rgba(28, 27, 23, 0.5);
+  cursor: pointer;
+  font: inherit;
+  font-size: 18px;
+  font-weight: 400;
+  line-height: 1;
+}
+
+.pwa-install-dismiss:hover {
+  background: rgba(28, 27, 23, 0.12);
+}
+
+@media (min-width: 768px) {
+  .pwa-install-prompt {
+    left: auto;
+    right: 24px;
+    bottom: 24px;
+    width: 380px;
+    max-width: none;
+    margin: 0;
+  }
+}
+
+@media (max-width: 360px) {
+  .pwa-install-prompt {
+    gap: 8px;
+    padding: 12px 10px;
+  }
+
+  .pwa-install-action {
+    min-height: 34px;
+    padding: 8px 12px;
+  }
+
+  .pwa-install-copy strong {
+    font-size: 12.5px;
+  }
+
+  .pwa-install-copy p {
+    font-size: 11.5px;
+  }
+}

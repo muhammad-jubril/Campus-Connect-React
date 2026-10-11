@@ -4,6 +4,7 @@ import { LoaderProvider } from "./context/LoaderContext";
 import { PeopleProvider } from "./context/PeopleContext";
 import { PostsProvider } from "./hooks/usePosts";
 import AppRoutes from "./routes/AppRoutes";
+import InstallPrompt from "./components/pwa/InstallPrompt";
 
 export default function App() {
   return (
@@ -17,6 +18,7 @@ export default function App() {
               <div className="bg-blob blob-3" />
               <div id="app">
                 <AppRoutes />
+                <InstallPrompt />
               </div>
             </PostsProvider>
           </PeopleProvider>
