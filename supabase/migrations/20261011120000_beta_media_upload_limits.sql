@@ -3,12 +3,12 @@
 begin;
 
 update storage.buckets
-set file_size_limit = 2097152,
+set file_size_limit = 1572864,
     allowed_mime_types = array['image/jpeg', 'image/png', 'image/webp']
 where id = 'avatars';
 
 update storage.buckets
-set file_size_limit = 5242880,
+set file_size_limit = 4194304,
     allowed_mime_types = array['image/jpeg', 'image/png', 'image/webp']
 where id = 'post-media';
 

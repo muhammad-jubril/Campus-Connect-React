@@ -16,7 +16,7 @@ export function getImageFileType(file) {
 }
 
 
-async function sniffImageType(file) {
+export async function detectImageType(file) {
   const bytes = new Uint8Array(await file.slice(0, 12).arrayBuffer());
   if (bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff) return "image/jpeg";
   if (bytes.length >= 8 &&
@@ -89,7 +89,7 @@ export function validateImageInput(file, purpose = "post") {
 
 export async function optimizeImage(file, purpose = "post") {
   const { type: inputType, preset } = validateImageInput(file, purpose);
-  const actualType = await sniffImageType(file);
+  const actualType = await detectImageType(file);
   if (!actualType) throw new Error("The file contents aren't a supported JPEG, PNG, or WebP image.");
   if (actualType !== inputType) throw new Error("The file contents don't match the selected image format. Save it as JPEG, PNG, or WebP and try again.");
   let decoded;
