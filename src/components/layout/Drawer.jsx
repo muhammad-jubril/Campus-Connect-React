@@ -62,7 +62,12 @@ export default function Drawer() {
   return (
     <>
       <div className={`drawer-overlay ${open ? "open" : ""}`} onClick={closeDrawer} aria-hidden="true" />
-      <nav className={`drawer-panel ${open ? "open" : ""}`} aria-label="More navigation" aria-hidden={!open}>
+      <nav
+  className={`drawer-panel ${open ? "open" : ""}`}
+  aria-label="More navigation"
+  aria-hidden={!open}
+  inert={!open ? "" : undefined}
+>
         <div className="drawer-top">
           <span className="drawer-kicker">CAMPUS CONNECT</span>
           <button type="button" className="drawer-close" onClick={closeDrawer} aria-label="Close menu">
