@@ -1,3 +1,4 @@
+
 import { useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import FacultyDepartmentPicker from "../components/common/FacultyDepartmentPicker";
@@ -42,8 +43,14 @@ export default function EditProfilePage() {
     }
 
     try {
-      const compressedFile = await compressImage(file, MAX_AVATAR_DIMENSION, 0.8);
+      const compressedFile = await compressImage(
+        file,
+        MAX_AVATAR_DIMENSION,
+        0.8
+      );
+
       setAvatarFile(compressedFile);
+
       const reader = new FileReader();
       reader.onload = (ev) => setAvatarPreview(ev.target.result);
       reader.readAsDataURL(compressedFile);
@@ -55,24 +62,36 @@ export default function EditProfilePage() {
 
   async function handleSave() {
     if (submitting) return;
+
     const missing = [];
     if (!name.trim()) missing.push("your name");
     if (!faculty) missing.push("your faculty");
     else if (!department) missing.push("your department");
     if (!level) missing.push("your level");
+
     if (missing.length > 0) {
       showToast(`Fill in ${joinList(missing)} to save`, "error");
       return;
     }
 
     setSubmitting(true);
+
     try {
       await runWithLoader("Saving changes…", async () => {
         let avatarUrl = currentUser.avatarDataUrl || null;
-        if (avatarFile) avatarUrl = await uploadToStorage("avatars", avatarFile, currentUser.id);
+
+        if (avatarFile) {
+          avatarUrl = await uploadToStorage(
+            "avatars",
+            avatarFile,
+            currentUser.id
+          );
+        }
+
         const savedName = name.trim();
         const savedBio = bio.trim();
         const bioValue = savedBio || null;
+
         await updateProfile(currentUser.id, {
           name: savedName,
           bio: bioValue,
@@ -81,6 +100,7 @@ export default function EditProfilePage() {
           level,
           avatar_url: avatarUrl,
         });
+
         setCurrentUser((prev) => ({
           ...prev,
           name: savedName,
@@ -91,12 +111,18 @@ export default function EditProfilePage() {
           avatarDataUrl: avatarUrl || "",
         }));
       });
+
       showToast("Profile updated");
       navigate(-1);
     } catch (err) {
       console.error("Profile save failed:", err);
       const friendlyMessage = getUploadErrorMessage(err, "avatar");
-      showToast(friendlyMessage || "Couldn't save — check your connection and try again", "error");
+
+      showToast(
+        friendlyMessage ||
+          "Couldn't save — check your connection and try again",
+        "error"
+      );
     } finally {
       setSubmitting(false);
     }
@@ -110,19 +136,50 @@ export default function EditProfilePage() {
         <p>This is how other students will see you.</p>
       </div>
 
-      <input ref={fileInputRef} type="file" accept="image/jpeg,image/png,image/webp" style={{ display: "none" }} onChange={handleAvatarChange} />
-      <div className="avatar-picker" onClick={() => fileInputRef.current?.click()}>
+      <input
+        id="profile-avatar"
+        ref={fileInputRef}
+        type="file"
+        accept="image/jpeg,image/png,image/webp"
+        style={{ display: "none" }}
+        onChange={handleAvatarChange}
+        aria-label="Profile photo"
+      />
+
+      <div
+        className="avatar-picker"
+        role="button"
+        tabIndex={0}
+        onClick={() => fileInputRef.current?.click()}
+        onKeyDown={(event) => {
+          if (event.key === "Enter" || event.key === " ") {
+            event.preventDefault();
+            fileInputRef.current?.click();
+          }
+        }}
+        aria-controls="profile-avatar"
+        aria-label={avatarPreview ? "Change profile photo" : "Add profile photo"}
+      >
         {avatarPreview ? <img src={avatarPreview} alt="" /> : "Add photo"}
       </div>
 
       <div className="field">
-        <label>Full name</label>
-        <input type="text" value={name} maxLength={MAX_NAME_LENGTH} onChange={(e) => setName(e.target.value)} placeholder="Your name" />
+        <label htmlFor="profile-name">Full name</label>
+        <input
+          id="profile-name"
+          type="text"
+          value={name}
+          maxLength={MAX_NAME_LENGTH}
+          onChange={(e) => setName(e.target.value)}
+          placeholder="Your name"
+          autoComplete="name"
+        />
       </div>
 
       <div className="field">
-        <label>Bio</label>
+        <label htmlFor="profile-bio">Bio</label>
         <textarea
+          id="profile-bio"
           className="post-textarea"
           style={{ minHeight: 70 }}
           value={bio}
@@ -130,24 +187,49 @@ export default function EditProfilePage() {
           onChange={(e) => setBio(e.target.value)}
           placeholder="A short line about you"
         />
-        <div className="post-char-count"><span>{bio.length}</span>/{MAX_BIO_LENGTH}</div>
+        <div className="post-char-count">
+          <span>{bio.length}</span>/{MAX_BIO_LENGTH}
+        </div>
       </div>
 
-      <FacultyDepartmentPicker faculty={faculty} department={department} onChange={({ faculty: nextFaculty, department: nextDepartment }) => { setFaculty(nextFaculty); setDepartment(nextDepartment); }} />
+      <FacultyDepartmentPicker
+        faculty={faculty}
+        department={department}
+        onChange={({ faculty: nextFaculty, department: nextDepartment }) => {
+          setFaculty(nextFaculty);
+          setDepartment(nextDepartment);
+        }}
+      />
 
       <div className="field">
-        <label>Level</label>
+        <label htmlFor="profile-level">Level</label>
         <div className="select-wrap-full">
-          <select value={level} onChange={(e) => setLevel(e.target.value)}>
+          <select
+            id="profile-level"
+            value={level}
+            onChange={(e) => setLevel(e.target.value)}
+          >
             <option value="">Select level</option>
-            <option>100</option><option>200</option><option>300</option><option>400</option><option>500</option>
+            <option>100</option>
+            <option>200</option>
+            <option>300</option>
+            <option>400</option>
+            <option>500</option>
             <option>600</option>
           </select>
         </div>
       </div>
 
       <div className="spacer" />
-      <button type="button" className="btn btn-primary" onClick={handleSave}>Save changes</button>
+
+      <button
+        type="button"
+        className="btn btn-primary"
+        onClick={handleSave}
+        disabled={submitting}
+      >
+        {submitting ? "Saving changes…" : "Save changes"}
+      </button>
     </div>
   );
 }
