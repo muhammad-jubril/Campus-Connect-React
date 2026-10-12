@@ -1,0 +1,24 @@
+{
+  "files": [
+    "NOTIFICATIONS-BACKEND-CONTRACT.md",
+    "README-NOTIFICATIONS-FRONTEND.md",
+    "public/push-sw.js",
+    "src/components/layout/AppLayout.jsx",
+    "src/components/layout/BottomNav.jsx",
+    "src/components/notifications/NotificationBadge.jsx",
+    "src/components/notifications/NotificationItem.jsx",
+    "src/components/notifications/NotificationList.jsx",
+    "src/hooks/useNotifications.js",
+    "src/hooks/useNotifications.jsx",
+    "src/pages/NotificationsPage.jsx",
+    "src/routes/AppRoutes.jsx",
+    "src/services/pushNotifications.js",
+    "src/services/supabase/notifications.js",
+    "src/styles/notifications.css",
+    "src/utils/notificationGrouping.js",
+    "tests/notification-grouping.test.js",
+    "vite.config.js"
+  ],
+  "sourceSnapshot": "Campus-Connect-React main inspected 2026-10-12",
+  "note": "The src/hooks/useNotifications.js compatibility bridge is included to avoid resolving the pre-existing empty .js stub instead of the JSX implementation. No git operations performed. Existing files in this ZIP replace the same paths."
+}

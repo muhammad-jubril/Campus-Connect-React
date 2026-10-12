@@ -27,6 +27,7 @@ import SearchStudentsPage from "../pages/SearchStudentsPage";
 import MarketplacePage from "../pages/MarketplacePage";
 import BlockedAccountsPage from "../pages/BlockedAccountsPage";
 import ModerationReportsPage from "../pages/ModerationReportsPage";
+import NotificationsPage from "../pages/NotificationsPage";
 import ComingSoonPage from "../pages/ComingSoonPage";
 import TermsPage from "../pages/TermsPage";
 import PrivacyPage from "../pages/PrivacyPage";
@@ -97,18 +98,7 @@ export default function AppRoutes() {
           <Route path="/feed" element={<FeedPage />} />
           <Route path="/post/:postId" element={<PostDetailPage />} />
           <Route path="/marketplace" element={<MarketplacePage />} />
-          <Route
-            path="/notifications"
-            element={
-              <ComingSoonPage
-                eyebrow="ACTIVITY"
-                title="Notifications"
-                blurb="Likes, comments, and campus updates will appear here — coming soon."
-                icon={icon("M6 8a6 6 0 0 1 12 0c0 5 2 6 2 6H4s2-1 2-6M10 20a2 2 0 0 0 4 0")}
-                shell
-              />
-            }
-          />
+          <Route path="/notifications" element={<NotificationsPage />} />
           <Route path="/profile" element={<ProfilePage />} />
         </Route>
 

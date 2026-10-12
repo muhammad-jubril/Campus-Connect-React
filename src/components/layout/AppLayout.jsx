@@ -6,6 +6,7 @@ import Drawer from "./Drawer";
 import Fab from "./Fab";
 import CommentsModal from "../feed/CommentsModal";
 import DesktopRightPanel from "./DesktopRightPanel";
+import { NotificationsProvider } from "../../hooks/useNotifications";
 
 export default function AppLayout() {
   const location = useLocation();
@@ -32,24 +33,26 @@ export default function AppLayout() {
   }
 
   return (
-    <div className={`app-shell${isPostDetail ? " app-shell-post-detail" : ""}`}>
-      <BottomNav />
+    <NotificationsProvider>
+      <div className={`app-shell${isPostDetail ? " app-shell-post-detail" : ""}`}>
+        <BottomNav />
 
-      <div className="desktop-app-body">
-        <Sidebar activePanel={activePanel} onOpenPanel={openRightPanel} />
+        <div className="desktop-app-body">
+          <Sidebar activePanel={activePanel} onOpenPanel={openRightPanel} />
 
-        <div className="app-content">
-          <div className="app-content-main" id="app-content-main">
-            <Outlet context={{ openRightPanel }} />
+          <div className="app-content">
+            <div className="app-content-main" id="app-content-main">
+              <Outlet context={{ openRightPanel }} />
+            </div>
           </div>
+
+          <DesktopRightPanel activePanel={activePanel} onClose={() => setActivePanel(null)} />
         </div>
 
-        <DesktopRightPanel activePanel={activePanel} onClose={() => setActivePanel(null)} />
+        <Fab />
+        <Drawer />
+        <CommentsModal />
       </div>
-
-      <Fab />
-      <Drawer />
-      <CommentsModal />
-    </div>
+    </NotificationsProvider>
   );
 }
