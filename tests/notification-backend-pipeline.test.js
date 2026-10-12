@@ -48,6 +48,14 @@ test("private subscription/queue tables and management RPCs are service-role onl
   assert.match(sql, /is_notification_pair_blocked\(new\.recipient_id, new\.actor_id\)/i);
 });
 
+test("subscription CORS explicitly allows the live production origin", async () => {
+  const source = await readFile(subscribeUrl, "utf8");
+  assert.match(source, /https:\/\/mycampusconnectt\.vercel\.app/);
+  assert.match(source, /DEFAULT_ALLOWED_ORIGINS/);
+  assert.match(source, /ENV_ALLOWED_ORIGINS/);
+  assert.match(source, /Access-Control-Allow-Origin/);
+});
+
 test("subscription endpoint verifies the session, derives user ID server-side and validates push endpoints", async () => {
   const source = await readFile(subscribeUrl, "utf8");
   assert.match(source, /auth\.getUser\(tokenMatch\[1\]\)/);

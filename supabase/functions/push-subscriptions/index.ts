@@ -2,9 +2,18 @@
 // from Supabase Auth; the request body never supplies a user ID.
 import { createClient } from "npm:@supabase/supabase-js@2.116.0";
 
-const ALLOWED_ORIGINS = (Deno.env.get("ALLOWED_ORIGINS") ??
-  "https://campus-connect-224y.vercel.app,http://localhost:5173,http://127.0.0.1:5173")
+// Keep known app origins in the allow-list even when ALLOWED_ORIGINS
+// is set to a narrower deployment-specific list. Supabase logs observed the
+// active production domain mycampusconnectt.vercel.app.
+const DEFAULT_ALLOWED_ORIGINS = [
+  "https://campus-connect-224y.vercel.app",
+  "https://mycampusconnectt.vercel.app",
+  "http://localhost:5173",
+  "http://127.0.0.1:5173",
+];
+const ENV_ALLOWED_ORIGINS = (Deno.env.get("ALLOWED_ORIGINS") ?? "")
   .split(",").map((origin) => origin.trim()).filter(Boolean);
+const ALLOWED_ORIGINS = [...new Set([...DEFAULT_ALLOWED_ORIGINS, ...ENV_ALLOWED_ORIGINS])];
 const PREVIEW_ORIGIN = /^https:\/\/campus-connect[a-z0-9-]*\.vercel\.app$/;
 const MAX_BODY_LENGTH = 12_000;
 
