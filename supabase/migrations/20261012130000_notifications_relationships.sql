@@ -57,13 +57,17 @@ CREATE INDEX IF NOT EXISTS notifications_reply_thread_idx
 DO $$
 DECLARE c record;
 BEGIN
-  REVOKE INSERT ON TABLE public.likes FROM PUBLIC, anon, authenticated;
+  REVOKE INSERT, UPDATE ON TABLE public.likes FROM PUBLIC, anon, authenticated;
   FOR c IN
     SELECT column_name FROM information_schema.columns
     WHERE table_schema = 'public' AND table_name = 'likes'
   LOOP
     EXECUTE format(
       'REVOKE INSERT (%I) ON TABLE public.likes FROM PUBLIC, anon, authenticated',
+      c.column_name
+    );
+    EXECUTE format(
+      'REVOKE UPDATE (%I) ON TABLE public.likes FROM PUBLIC, anon, authenticated',
       c.column_name
     );
   END LOOP;
