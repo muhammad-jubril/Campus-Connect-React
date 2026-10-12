@@ -105,11 +105,6 @@ const panels = {
     title: "Communities",
     description: "Discover campus interests and communities here when this feature is ready.",
   },
-  settings: {
-    eyebrow: "YOUR ACCOUNT",
-    title: "Settings",
-    description: "Account preferences and privacy controls are being prepared.",
-  },
 };
 
 const emptyCopy = {
@@ -247,20 +242,6 @@ export default function DesktopRightPanel({ activePanel, onClose }) {
         </header>
 
         {panelKey === "explore" && <ExploreHome />}
-
-        {panelKey === "settings" && (
-          <>
-            <p className="desktop-panel-settings-note">{panel.description}</p>
-            <div className="desktop-panel-settings-list">
-              {["Profile preferences", "Privacy & security", "Notification preferences"].map((item) => (
-                <div className="desktop-panel-setting" key={item}>
-                  <span>{item}</span>
-                  <span className="desktop-panel-coming-soon">Coming soon</span>
-                </div>
-              ))}
-            </div>
-          </>
-        )}
 
         {empty && (
           <div className="desktop-panel-empty">

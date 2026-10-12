@@ -101,6 +101,31 @@ async function getExistingRegistration() {
   return registration;
 }
 
+async function isSubscriptionRegistered(subscription, userId) {
+  if (!isTrustedPushEndpoint()) throw new Error("Push subscription endpoint must be the push-subscriptions function on the configured Supabase project.");
+  const session = await getSessionForUser(userId);
+  const endpoint = new URL(PUSH_ENDPOINT);
+  endpoint.searchParams.set("endpoint", subscription.endpoint);
+  const response = await fetch(endpoint.toString(), {
+    method: "GET",
+    headers: {
+      apikey: import.meta.env.VITE_SUPABASE_ANON_KEY || "",
+      Authorization: `Bearer ${session.access_token}`,
+    },
+  });
+  if (!response.ok) {
+    let detail = "";
+    try {
+      const result = await response.json();
+      detail = result?.error || result?.message || "";
+    } catch { /* The JSON body is optional on an error. */ }
+    throw new Error(detail || `Push service returned HTTP ${response.status}.`);
+  }
+  const result = await response.json();
+  if (typeof result?.registered !== "boolean") throw new Error("The push service returned an invalid subscription status.");
+  return result.registered;
+}
+
 export async function getPushStatus(userId) {
   const capability = getPushConfiguration();
   const permission = typeof Notification === "undefined" ? "unsupported" : Notification.permission;
@@ -137,9 +162,15 @@ export async function getPushStatus(userId) {
         : pushError("permission-required", "Enable push to ask your browser for permission.", { permission, subscriptionStatus: "absent" });
     }
 
-    // A local subscription alone is not evidence that the backend has saved it.
-    // PUT is an idempotent upsert in the documented backend contract.
-    await sendSubscriptionToBackend("PUT", subscription, userId);
+    // Status checks are read-only: opening Settings must never silently opt the
+    // device back in after the server registration has been removed.
+    const registered = await isSubscriptionRegistered(subscription, userId);
+    if (!registered) {
+      return pushError("not-registered", "A browser subscription exists, but the push service has no matching registration. Turn push on to reconnect this device.", {
+        permission,
+        subscriptionStatus: "not-registered",
+      });
+    }
     return pushError("enabled", "Push notifications are enabled on this device.", {
       permission,
       subscriptionStatus: "registered",
@@ -151,7 +182,7 @@ export async function getPushStatus(userId) {
   }
 }
 
-export async function enablePushNotifications(userId) {
+export async function enablePushNotifications(userId, { renewExisting = false } = {}) {
   const capability = getPushConfiguration();
   if (!capability.supported) throw new Error("Push notifications are not supported by this browser or connection.");
   if (!capability.configured) throw new Error("Push is not connected yet. The backend push endpoint and public VAPID key must be configured first.");
@@ -168,13 +199,26 @@ export async function enablePushNotifications(userId) {
 
   const registration = await getExistingRegistration();
   let subscription = await registration.pushManager.getSubscription();
-  const createdHere = !subscription;
+  let createdHere = !subscription;
+
+  if (subscription && renewExisting) {
+    // GET confirmed that this endpoint is not registered for the signed-in user.
+    // Delete any owned server row first, then rotate the local endpoint so an
+    // expired subscription is not immediately re-added under a new UI status.
+    await sendSubscriptionToBackend("DELETE", subscription, userId);
+    const removed = await subscription.unsubscribe();
+    if (!removed) throw new Error("The old browser subscription could not be removed. Push remains unconfirmed; try again.");
+    subscription = await registration.pushManager.getSubscription();
+    if (subscription) throw new Error("The browser still reports the old subscription. Push remains unconfirmed; try again.");
+    createdHere = true;
+  }
 
   if (!subscription) {
     subscription = await registration.pushManager.subscribe({
       userVisibleOnly: true,
       applicationServerKey: decodeVapidKey(VAPID_PUBLIC_KEY.trim()),
     });
+    createdHere = true;
   }
 
   try {

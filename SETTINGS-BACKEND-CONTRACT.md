@@ -2,7 +2,7 @@
 
 ## Notification category preferences (migration included in this patch)
 
-Apply `supabase/migrations/20261012180000_settings_notification_preferences.sql` after the existing notifications push-pipeline migration and before deploying the updated dispatcher Edge Function.
+Apply `supabase/migrations/20261012180000_settings_notification_preferences.sql` after `supabase/migrations/20261012120000_notifications_push_pipeline.sql` in this source bundle (or the matching version already installed in your project) and before deploying the updated `dispatch-push-notifications` Edge Function. Deploy the updated `push-subscriptions` Edge Function as well: Settings uses its authenticated, read-only `GET ?endpoint=...` operation to verify whether the current browser subscription is actually registered for the signed-in user.
 
 The app reads and updates `public.notification_preferences` through the signed-in Supabase client. The caller does not provide `user_id`; PostgreSQL defaults it from `auth.uid()`. The table contract is:
 
@@ -17,7 +17,7 @@ RLS permits a user to read/insert/update only their row. Column grants exclude `
 
 `supabase/functions/dispatch-push-notifications/index.ts` now checks the saved category preference immediately before delivery. Turning off a category suppresses only its Web Push delivery. The underlying `public.notifications` rows, unread counters and in-app history remain unchanged. Re-deploy this Edge Function after applying the migration.
 
-The master switch in Settings controls the current browser/device subscription using the existing authenticated `push-subscriptions` Edge Function. The UI reports browser permission separately from a subscription confirmed against the backend. A device permission denial does not prevent removal of a local subscription that still exists.
+The master switch in Settings controls the current browser/device subscription using the authenticated `push-subscriptions` Edge Function. The UI reports browser permission separately from a subscription confirmed against the backend. Status checks are read-only; opening Settings will not recreate a registration deleted server-side. If a local subscription exists but no server row matches, the UI marks it unregistered and rotates it only after the user explicitly turns push on. A device permission denial does not prevent removal of a local subscription that still exists.
 
 ## Account deletion endpoint (backend work still required)
 

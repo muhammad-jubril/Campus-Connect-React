@@ -51,7 +51,7 @@ export default function Sidebar({ activePanel, onOpenPanel }) {
         <NavLink to="/lost-found" className="desktop-sidebar-link"><span className="desktop-sidebar-link-icon"><LostIcon /></span><span><b>Lost &amp; Found</b></span></NavLink>
 
         <div className="desktop-sidebar-section-label app-label">App</div>
-        <SidebarPanelLink to="/settings" panel="settings" activePanel={activePanel} onOpenPanel={onOpenPanel}><span className="desktop-sidebar-link-icon"><SettingsIcon /></span><span><b>Settings</b></span></SidebarPanelLink>
+        <NavLink to="/settings" className="desktop-sidebar-link"><span className="desktop-sidebar-link-icon"><SettingsIcon /></span><span><b>Settings</b></span></NavLink>
         <NavLink to="/help" className="desktop-sidebar-link"><span className="desktop-sidebar-link-icon"><HelpIcon /></span><span><b>Help &amp; Support</b></span></NavLink>
       </div>
 

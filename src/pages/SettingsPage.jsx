@@ -14,6 +14,10 @@ import {
 } from "../services/supabase/notificationPreferences";
 import "../styles/settings.css";
 
+// Keep the destructive action unavailable until the matching secure Edge Function
+// is included, deployed, and validated against the approved retention policy.
+const ACCOUNT_DELETION_BACKEND_READY = false;
+
 const CATEGORY_PREFERENCES = [
   { key: "push_likes", title: "Post likes", description: "When someone likes one of your posts." },
   { key: "push_comments", title: "Comments", description: "When someone comments on one of your posts." },
@@ -42,6 +46,7 @@ function deviceStateLabel(status, subscriptionStatus) {
     enabled: "Subscription saved with backend",
     disabled: "No active subscription on this device",
     "permission-required": "Browser permission required",
+    "not-registered": "Browser subscription is not registered with the backend",
     "permission-denied": "Browser permission denied",
     unsupported: "This device or connection does not support push",
     "not-configured": "Push service is not configured",
@@ -105,6 +110,7 @@ export default function SettingsPage() {
   const canTogglePush = pushState.status === "enabled"
     || (pushState.status === "disabled" && browserPermission !== "denied")
     || pushState.status === "permission-required"
+    || pushState.status === "not-registered"
     || (pushState.status === "permission-denied" && pushState.subscriptionStatus === "present");
   const needsPushRetry = ["sync-error", "service-worker-not-ready", "error"].includes(pushState.status);
 
@@ -170,7 +176,7 @@ export default function SettingsPage() {
     try {
       const next = isPushEnabled
         ? await disablePushNotifications(currentUser.id)
-        : await enablePushNotifications(currentUser.id);
+        : await enablePushNotifications(currentUser.id, { renewExisting: pushState.status === "not-registered" });
       setPushState(next);
       setBrowserPermission(permissionState());
       showToast(next.message || (next.status === "enabled" ? "Push enabled on this device" : "Push disabled on this device"));
@@ -206,6 +212,10 @@ export default function SettingsPage() {
 
   async function handleDeleteAccount(event) {
     event.preventDefault();
+    if (!ACCOUNT_DELETION_BACKEND_READY) {
+      setDeleteError("Secure account deletion is not available in this build because the required backend workflow is not included and verified.");
+      return;
+    }
     if (!currentUser?.id || deletingAccountRef.current || deletePhrase.trim() !== "DELETE" || !deleteAcknowledged) return;
 
     deletingAccountRef.current = true;
@@ -353,7 +363,8 @@ export default function SettingsPage() {
 
       <section className="settings-card settings-danger-card" aria-labelledby="settings-delete-title">
         <SectionHeading id="settings-delete-title" eyebrow="PERMANENT ACTION" title="Delete account" description="Account deletion cannot be undone. The secure deletion service must complete the request before the app signs you out. Limited records may be retained where required for legal, safety, or dispute-handling purposes." />
-        <button type="button" className="btn btn-danger settings-delete-button" onClick={openDeleteDialog}>Delete account…</button>
+        <button type="button" className="btn btn-danger settings-delete-button" onClick={openDeleteDialog} disabled={!ACCOUNT_DELETION_BACKEND_READY} aria-describedby="settings-delete-backend-status">Delete account…</button>
+        {!ACCOUNT_DELETION_BACKEND_READY && <p id="settings-delete-backend-status" className="settings-error" role="status">Account deletion is unavailable in this build. The repository does not include the required server-side deletion workflow; this control remains disabled until the cleanup and retention policy is implemented and tested.</p>}
       </section>
 
       {deleteDialogOpen && (

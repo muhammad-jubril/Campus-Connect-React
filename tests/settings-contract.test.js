@@ -74,6 +74,9 @@ test("account deletion requires explicit confirmation and server-confirmed compl
   assert.match(page, /deleteAcknowledged/);
   assert.match(page, /supabase\.functions\.invoke\("delete-account"/);
   assert.match(page, /data\?\.status !== "deleted"/);
+  assert.match(page, /ACCOUNT_DELETION_BACKEND_READY = false/);
+  assert.match(page, /disabled={!ACCOUNT_DELETION_BACKEND_READY}/);
+  assert.match(page, /The repository does not include the required server-side deletion workflow/);
   assert.doesNotMatch(page, /\.from\(["'](?:profiles|posts|comments|auth\.users)["']\)\.delete\(/);
   assert.match(contract, /does not contain a secure `delete-account` Edge Function/i);
   assert.match(contract, /status.*deleted/i);
@@ -98,4 +101,20 @@ test("Settings handlers guard against duplicate preference, push, and destructiv
   assert.match(page, /savingPreferenceRef\.current/);
   assert.match(page, /pushBusyRef\.current/);
   assert.match(page, /deletingAccountRef\.current/);
+});
+
+
+test("opening or refreshing Settings does not silently recreate a deleted or expired device subscription", async () => {
+  const [page, client, endpoint] = await Promise.all([
+    readFile(settingsUrl, "utf8"),
+    readFile(pushServiceUrl, "utf8"),
+    readFile(new URL("supabase/functions/push-subscriptions/index.ts", root), "utf8"),
+  ]);
+  assert.match(page, /"not-registered": "Browser subscription is not registered with the backend"/);
+  assert.match(page, /renewExisting: pushState\.status === "not-registered"/);
+  const statusReader = client.slice(client.indexOf("export async function getPushStatus"), client.indexOf("export async function enablePushNotifications"));
+  assert.match(statusReader, /isSubscriptionRegistered\(subscription, userId\)/);
+  assert.doesNotMatch(statusReader, /sendSubscriptionToBackend\("PUT"/);
+  assert.match(endpoint, /request\.method === "GET"[\s\S]*?eq\("user_id", authData\.user\.id\)[\s\S]*?eq\("endpoint", endpoint\)/);
+  assert.match(client, /sendSubscriptionToBackend\("DELETE", subscription, userId\);[\s\S]*?subscription\.unsubscribe\(\)[\s\S]*?pushManager\.subscribe\(\{/);
 });
