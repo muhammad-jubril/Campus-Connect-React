@@ -26,6 +26,8 @@ test("follow RPC binds identity to auth.uid and makes repeat requests idempotent
   assert.match(sql, /v_actor_id uuid := auth\.uid\(\)/i);
   assert.match(sql, /p_following_id = v_actor_id/i);
   assert.match(sql, /public\.is_notification_pair_blocked\(v_actor_id, p_following_id\)/i);
+  assert.match(sql, /not public\.is_user_blocked\(f\.follower_id\)/i);
+  assert.match(sql, /not public\.is_user_blocked\(f\.following_id\)/i);
   assert.match(sql, /on conflict on constraint follows_follower_following_unique do nothing/i);
   assert.match(sql, /return v_follow_id is not null/i);
   assert.match(sql, /function public\.unfollow_student\(p_following_id uuid\)/i);
@@ -44,7 +46,7 @@ test("follow counts and profile lists return accurate count and profile metadata
   for (const field of ["username", "name", "avatar_url", "faculty", "department", "level", "bio", "followed_at", "is_following", "is_followed_by"]) {
     assert.match(sql, new RegExp("\\b" + field + "\\b", "i"));
   }
-  assert.match(sql, /not public\.is_user_blocked\(p_profile_id\)/i);
+  assert.match(sql, /or public\.is_user_blocked\(p_profile_id\)/i);
   assert.match(sql, /not public\.is_notification_pair_blocked\(f\.follower_id, f\.following_id\)/i);
   assert.match(sql, /least\(greatest\(coalesce\(p_limit, 20\), 1\), 100\)/i);
 });
