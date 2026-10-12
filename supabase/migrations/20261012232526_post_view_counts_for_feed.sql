@@ -48,7 +48,7 @@ BEGIN
 END;
 $function$;
 
-REVOKE ALL ON FUNCTION public.get_post_view_counts(uuid[]) FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.get_post_view_counts(uuid[]) FROM PUBLIC, anon, authenticated, service_role;
 GRANT EXECUTE ON FUNCTION public.get_post_view_counts(uuid[]) TO authenticated;
 
 COMMENT ON FUNCTION public.get_post_view_counts(uuid[]) IS
