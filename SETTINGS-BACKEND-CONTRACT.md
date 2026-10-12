@@ -1,6 +1,6 @@
 # Campus Connect Settings — backend integration contract
 
-This contract describes the implementation in this branch and records the three live migrations applied to Supabase: `20261012203746_settings_notification_preferences`, `20261012203752_notification_preferences_master_push`, and `settings_account_deletion_backend` (live migration version `20261012203901`), plus the reviewer-redaction correction in `account_deletion_reviewer_redaction`. Account deletion must remain unavailable in the UI until a successful end-to-end test in an approved disposable test account has completed.
+This contract describes the implementation in this branch and records the three live migrations applied to Supabase: `20261012203746_settings_notification_preferences`, `20261012203752_notification_preferences_master_push`, and `settings_account_deletion_backend` (live migration version `20261012203901`), plus the reviewer-redaction correction in `account_deletion_reviewer_redaction`. Account deletion must remain unavailable in the UI until a successful end-to-end test with a disposable Campus Connect account has completed.
 
 ## Notification preferences
 
