@@ -1,5 +1,5 @@
 -- Notification relationship contract extension.
--- Builds on 20261012120000_notifications_push_pipeline.sql and reuses its queue,
+-- Builds on 20261012140537_notifications_push_pipeline.sql and reuses its queue,
 -- subscription table, receipts, RPCs and dispatcher. This does not create a
 -- second queue or delete existing notification/activity rows.
 BEGIN;
