@@ -1,6 +1,6 @@
 # Web Push deployment checklist
 
-The backend stores VAPID credentials and its dispatch secret in Supabase Vault. Actual delivery additionally requires the deployed dispatcher and scheduled caller. The dispatcher retrieves VAPID material through a service-role-only, dispatch-secret-guarded RPC. Never commit VAPID private keys, dispatch secrets, service-role keys, or real Vault values, and never put the VAPID private key or any secret in `VITE_*`.
+The backend stores VAPID credentials and its dispatch secret in Supabase Vault. Actual delivery additionally requires the deployed dispatcher and scheduled caller. The dispatcher retrieves VAPID material through a service-role-only, dispatch-secret-guarded RPC. Never commit VAPID private keys, dispatch secrets, service-role keys, or real Vault values, and never put the VAPID private key or any secret in `VITE_*`. Never put this in `VITE_*`, even in deployment examples.
 
 ## 1. Migration order
 
