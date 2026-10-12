@@ -213,11 +213,23 @@ $$;
 GRANT SELECT ON TABLE public.notifications TO authenticated;
 GRANT UPDATE (read) ON TABLE public.notifications TO authenticated;
 
--- The standard notifications SELECT and update-read policies already exist.
--- Rebuild the update policy so a recipient cannot reassign rows even if legacy
--- permissive policies existed.
-DROP POLICY IF EXISTS notifications_update_own ON public.notifications;
-DROP POLICY IF EXISTS notifications_update_read_own ON public.notifications;
+-- Rebuild every UPDATE policy, not just a known legacy name: permissive
+-- RLS policies are OR-combined, so an unknown older UPDATE policy must not survive.
+DO $
+DECLARE p record;
+BEGIN
+  FOR p IN
+    SELECT policyname
+    FROM pg_policies
+    WHERE schemaname = 'public'
+      AND tablename = 'notifications'
+      AND cmd = 'UPDATE'
+  LOOP
+    EXECUTE format('DROP POLICY IF EXISTS %I ON public.notifications', p.policyname);
+  END LOOP;
+END
+$;
+
 CREATE POLICY notifications_update_read_own
 ON public.notifications FOR UPDATE TO authenticated
 USING (recipient_id = (SELECT auth.uid()))
@@ -441,13 +453,6 @@ BEGIN
 END
 $$;
 REVOKE ALL ON FUNCTION public.queue_notification_push() FROM PUBLIC, anon, authenticated;
-
--- The pipeline migration only attached these optional hooks where relationships
--- already existed. This migration creates them, so triggers are explicitly wired.
-DROP TRIGGER IF EXISTS follows_notify_recipient ON public.follows;
-CREATE TRIGGER follows_notify_recipient
-AFTER INSERT ON public.follows
-FOR EACH ROW EXECUTE FUNCTION public.notify_on_follow_relationship();
 
 -- Trigger queueing is ordered by creation on notifications and works for the
 -- existing trigger function; ensure publication membership if this migration is
