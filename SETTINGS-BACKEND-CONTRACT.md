@@ -32,7 +32,7 @@ The trusted dispatcher maps `like`, `comment`, `reply`, and `follow` to their ca
 
 ## Account deletion hybrid policy
 
-Migration: `supabase/migrations/20261012195000_settings_account_deletion_backend.sql`, `supabase/migrations/20261012210000_account_deletion_reviewer_redaction.sql`, and `supabase/migrations/20261012211000_account_deletion_target_reference_cleanup.sql`.
+Migrations: `supabase/migrations/20261012195000_settings_account_deletion_backend.sql`, `supabase/migrations/20261012210000_account_deletion_reviewer_redaction.sql`, `supabase/migrations/20261012211000_account_deletion_target_reference_cleanup.sql`, and `supabase/migrations/20261012211500_guard_push_registration_during_account_deletion.sql`.
 Edge Function: `supabase/functions/delete-account/index.ts`.
 
 The function uses `SUPABASE_URL`, `SUPABASE_ANON_KEY`, and `SUPABASE_SERVICE_ROLE_KEY` from its trusted server environment. Never place the service-role key in Vite variables or the client. Deploy with JWT verification enabled. A separate 256-bit worker secret is generated into Supabase Vault by the migration. The one-minute push scheduler and its Vault secret are unchanged.
