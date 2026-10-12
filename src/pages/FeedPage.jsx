@@ -1,23 +1,36 @@
-import { useEffect, useState } from "react";
-import { useNavigate, useOutletContext } from "react-router-dom";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useLocation, useNavigate, useOutletContext } from "react-router-dom";
 import PostCard from "../components/feed/PostCard";
 import FeedSkeleton from "../components/common/Skeleton";
 import MobileMenuButton from "../components/layout/MobileMenuButton";
+import { useAuth } from "../hooks/useAuth";
 import { usePosts } from "../hooks/usePosts";
+import {
+  getFeedScrollPosition,
+  restoreFeedScrollPosition,
+} from "../utils/feedScrollPosition.js";
 
 export default function FeedPage() {
   const {
     posts,
     postsError,
+    isFeedLoaded,
     loadPosts,
     loadMorePosts,
     hasMorePosts,
     loadingMorePosts,
     loadMoreError,
   } = usePosts();
-  const [loading, setLoading] = useState(true);
+  const { currentUser } = useAuth();
+  const location = useLocation();
   const navigate = useNavigate();
   const { openRightPanel } = useOutletContext() || {};
+  const currentUserId = currentUser?.id || null;
+  // A matching saved position proves this is the same feed history entry that
+  // opened a post. Keep the cached list visible instead of briefly replacing it
+  // with skeletons (which would clamp the nested scroll container to the top).
+  const [loading, setLoading] = useState(() => !isFeedLoaded);
+  const didRestoreScrollRef = useRef(false);
 
   function openChats() {
     if (window.matchMedia("(min-width: 768px)").matches && openRightPanel) {
@@ -31,7 +44,9 @@ export default function FeedPage() {
     let active = true;
 
     async function loadFeed() {
-      setLoading(true);
+      // loadPosts() already returns from the shared context cache when the feed
+      // was loaded earlier. Avoid a loading-state flash for a saved feed entry.
+      if (!isFeedLoaded) setLoading(true);
       await loadPosts();
       if (active) setLoading(false);
     }
@@ -40,8 +55,28 @@ export default function FeedPage() {
     return () => { active = false; };
   }, [loadPosts]);
 
+  useLayoutEffect(() => {
+    if (didRestoreScrollRef.current || loading || postsError || !isFeedLoaded) return undefined;
+
+    const savedPosition = getFeedScrollPosition(location.key, currentUserId);
+    if (!savedPosition) {
+      didRestoreScrollRef.current = true;
+      return undefined;
+    }
+
+    // Wait until the cached feed DOM is committed, then restore both possible
+    // scrolling surfaces: desktop's nested content container and mobile window.
+    const frame = window.requestAnimationFrame(() => {
+      restoreFeedScrollPosition(savedPosition);
+      didRestoreScrollRef.current = true;
+    });
+
+    return () => window.cancelAnimationFrame(frame);
+  }, [loading, posts.length, postsError, isFeedLoaded, location.key, currentUserId]);
+
   async function handleRetry() {
     setLoading(true);
+    didRestoreScrollRef.current = true;
     await loadPosts(true);
     setLoading(false);
   }

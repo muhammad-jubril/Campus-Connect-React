@@ -274,11 +274,13 @@ export function PostsProvider({ children }) {
   }, []);
 
   const visiblePosts = postsOwnerId === currentUserId ? posts : [];
+  const isFeedLoaded = loadedRef.current && loadedUserIdRef.current === currentUserId && loadedScopeRef.current === "feed";
 
   return (
     <PostsContext.Provider value={{
       posts: visiblePosts,
       postsError,
+      isFeedLoaded,
       loadPosts,
       loadPostsByAuthor,
       loadMorePosts,

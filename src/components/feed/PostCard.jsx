@@ -1,5 +1,5 @@
 import { useCallback, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import Avatar from "../common/Avatar";
 import EditPostForm from "./EditPostForm";
 import ImageViewer from "./ImageViewer";
@@ -9,6 +9,10 @@ import { useAuth } from "../../hooks/useAuth";
 import { usePosts } from "../../hooks/usePosts";
 import { useToast } from "../../hooks/useToast";
 import { timeAgo } from "../../utils/timeAgo";
+import {
+  captureCurrentScrollPosition,
+  saveFeedScrollPosition,
+} from "../../utils/feedScrollPosition.js";
 
 function MediaBlock({ media, onPreview, authorName }) {
   if (!media) return null;
@@ -76,15 +80,28 @@ export default function PostCard({
   const { toggleLike } = usePosts();
   const { showToast } = useToast();
   const navigate = useNavigate();
+  const location = useLocation();
   const [justLiked, setJustLiked] = useState(false);
   const [editing, setEditing] = useState(false);
   const [imageViewer, setImageViewer] = useState(null);
 
   const author = getPerson(post.authorUsername);
   const isSelf = currentUser && post.authorId === currentUser.id;
-  const openPost = openOnClick
-    ? () => navigate(`/post/${post.id}`, { state: { post } })
-    : undefined;
+
+  function navigateToPost(hash = "") {
+    // Save only when the user opens a detail page from the Campus Feed. The
+    // history key lets restoration target this exact feed entry and user.
+    if (location.pathname === "/feed") {
+      saveFeedScrollPosition(
+        location.key,
+        currentUser?.id || null,
+        captureCurrentScrollPosition(),
+      );
+    }
+    navigate(`/post/${post.id}${hash}`, { state: { post } });
+  }
+
+  const openPost = openOnClick ? () => navigateToPost() : undefined;
   const closeImageViewer = useCallback(() => setImageViewer(null), []);
 
   function handlePreview(src, index, triggerElement) {
@@ -144,7 +161,7 @@ export default function PostCard({
       onOpenComments(event.currentTarget);
       return;
     }
-    navigate(`/post/${post.id}#comments`, { state: { post } });
+    navigateToPost("#comments");
   }
 
   return (
