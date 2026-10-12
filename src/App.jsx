@@ -5,6 +5,7 @@ import { PeopleProvider } from "./context/PeopleContext";
 import { PostsProvider } from "./hooks/usePosts";
 import AppRoutes from "./routes/AppRoutes";
 import InstallPrompt from "./components/pwa/InstallPrompt";
+import PwaUpdatePrompt from "./components/pwa/PwaUpdatePrompt";
 
 export default function App() {
   return (
@@ -20,6 +21,7 @@ export default function App() {
                 <AppRoutes />
                 <InstallPrompt />
               </div>
+              <PwaUpdatePrompt />
             </PostsProvider>
           </PeopleProvider>
         </LoaderProvider>
