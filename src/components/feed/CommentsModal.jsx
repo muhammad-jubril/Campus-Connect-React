@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import Avatar from "../common/Avatar";
 import ConfirmDialog from "../common/ConfirmDialog";
+import ContentSafetyMenu from "../safety/ContentSafetyMenu";
 import { usePeople } from "../../hooks/usePeople";
 import { usePosts } from "../../hooks/usePosts";
 import { useAuth } from "../../hooks/useAuth";
@@ -117,8 +118,8 @@ export default function CommentsModal() {
     );
   }
 
-  function requestDelete(comment, event) {
-    deleteTriggerRef.current = event.currentTarget;
+  function requestDelete(comment, triggerElement) {
+    deleteTriggerRef.current = triggerElement || inputRef.current;
     setPendingDelete(comment);
   }
 
@@ -180,23 +181,25 @@ export default function CommentsModal() {
                     <div className="comment-text">{c.text}</div>
                     <div className="comment-time">{timeAgo(c.createdAt)}</div>
                   </div>
-                  {canDeleteComment(c) && (
-                    <button
-                      type="button"
-                      className="comments-modal-close"
-                      onClick={(event) => requestDelete(c, event)}
-                      aria-label="Delete comment"
-                      title="Delete comment"
-                      style={{ color: "var(--accent-red)", flexShrink: 0 }}
-                    >
-                      <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
-                        <path d="M4 7h16" />
-                        <path d="M10 11v6M14 11v6" />
-                        <path d="M6 7l1 13h10l1-13" />
-                        <path d="M9 7V4h6v3" />
-                      </svg>
-                    </button>
-                  )}
+                  <ContentSafetyMenu
+                    targetType="comment"
+                    targetId={c.id}
+                    reportedUserId={c.authorId}
+                    targetAuthorId={c.authorId}
+                    targetUsername={c.authorUsername}
+                    targetLabel="comment"
+                    canDeleteTarget={canDeleteComment(c)}
+                    onDelete={(triggerElement) => requestDelete(c, triggerElement)}
+                    onBlocked={(blockedUserId) => {
+                      const removedCount = (comments || []).filter((item) => item.authorId === blockedUserId).length;
+                      setComments((previous) => (previous || []).filter((item) => item.authorId !== blockedUserId));
+                      if (post?.authorId === blockedUserId) {
+                        onClose();
+                        return;
+                      }
+                      if (post?.id && removedCount > 0) bumpCommentCount(post.id, -removedCount);
+                    }}
+                  />
                 </div>
               );
             })

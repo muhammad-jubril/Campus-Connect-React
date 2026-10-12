@@ -180,7 +180,7 @@ export default function PostCard({
                 <span style={{ marginLeft: 6, textTransform: "none" }}>(edited)</span>
               )}
             </div>
-            {isSelf && showPostMenu && <PostMenu post={post} onEdit={() => setEditing(true)} />}
+            {showPostMenu && <PostMenu post={post} onEdit={() => setEditing(true)} />}
           </div>
         </div>
 

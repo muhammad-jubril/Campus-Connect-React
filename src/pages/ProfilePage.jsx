@@ -4,6 +4,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import Avatar from "../components/common/Avatar";
 import FeedSkeleton from "../components/common/Skeleton";
 import PostCard from "../components/feed/PostCard";
+import ContentSafetyMenu from "../components/safety/ContentSafetyMenu";
 import MobileMenuButton from "../components/layout/MobileMenuButton";
 import { useAuth } from "../hooks/useAuth";
 import { usePosts } from "../hooks/usePosts";
@@ -247,11 +248,22 @@ export default function ProfilePage() {
                     strokeWidth="1.8"
                     strokeLinecap="round"
                     strokeLinejoin="round"
+                    aria-hidden="true"
                   >
                     <path d="M12 20h9" />
                     <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L8 18l-4 1 1-4Z" />
                   </svg>
                 </button>
+              )}
+              {!isOwnProfile && (
+                <ContentSafetyMenu
+                  targetType="account"
+                  targetId={person.id}
+                  reportedUserId={person.id}
+                  targetAuthorId={person.id}
+                  targetUsername={person.username}
+                  targetLabel="account"
+                />
               )}
             </div>
 
@@ -271,6 +283,15 @@ export default function ProfilePage() {
                 onClick={() => navigate("/profile/edit")}
               >
                 Edit profile
+              </button>
+            )}
+            {isOwnProfile && (
+              <button
+                type="button"
+                className="profile-edit-btn"
+                onClick={() => navigate("/blocked-accounts")}
+              >
+                Blocked accounts
               </button>
             )}
           </div>

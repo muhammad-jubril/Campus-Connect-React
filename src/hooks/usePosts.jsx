@@ -233,6 +233,39 @@ export function PostsProvider({ children }) {
     setPosts((prev) => prev.filter((p) => p.id !== postId));
   }, []);
 
+  // Update this shared cache only after a hide/block operation has succeeded
+  // on the backend. Pagination cursors are retained to avoid duplicate pages.
+  const hidePostFromCache = useCallback((postId) => {
+    // Reject stale responses from pages started before the successful hide.
+    loadRequestRef.current += 1;
+    loadMoreInFlightRef.current = false;
+    setLoadingMorePosts(false);
+    setLoadMoreError(null);
+    setPosts((previous) => previous.filter((post) => post.id !== postId));
+  }, []);
+
+  const hideUserPostsFromCache = useCallback((userId) => {
+    // Reject feed/profile requests started before the successful block.
+    loadRequestRef.current += 1;
+    loadMoreInFlightRef.current = false;
+    setLoadingMorePosts(false);
+    setLoadMoreError(null);
+    setPosts((previous) => previous.filter((post) => post.authorId !== userId));
+  }, []);
+
+  // Unblocking can make cached rows eligible again. Force a fresh feed load
+  // the next time FeedPage mounts, without changing scroll behavior otherwise.
+  const invalidatePostsCache = useCallback(() => {
+    // Invalidate in-flight reads too; the next feed/profile visit reloads
+    // data under the newly changed block relationship.
+    loadRequestRef.current += 1;
+    loadMoreInFlightRef.current = false;
+    setLoadingMorePosts(false);
+    setLoadMoreError(null);
+    loadedRef.current = false;
+    loadedScopeRef.current = null;
+  }, []);
+
   const toggleLike = useCallback(async (postId) => {
     if (!currentUser) return;
     const target = posts.find((p) => p.id === postId);
@@ -291,6 +324,9 @@ export function PostsProvider({ children }) {
       syncPost,
       updatePostText,
       removePost,
+      hidePostFromCache,
+      hideUserPostsFromCache,
+      invalidatePostsCache,
       toggleLike,
       bumpCommentCount,
       activePost: visiblePosts.find((p) => p.id === activeCommentsPostId) || null,

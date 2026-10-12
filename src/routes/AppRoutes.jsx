@@ -25,6 +25,8 @@ import ProfilePage from "../pages/ProfilePage";
 import EditProfilePage from "../pages/EditProfilePage";
 import SearchStudentsPage from "../pages/SearchStudentsPage";
 import MarketplacePage from "../pages/MarketplacePage";
+import BlockedAccountsPage from "../pages/BlockedAccountsPage";
+import ModerationReportsPage from "../pages/ModerationReportsPage";
 import ComingSoonPage from "../pages/ComingSoonPage";
 import TermsPage from "../pages/TermsPage";
 import PrivacyPage from "../pages/PrivacyPage";
@@ -109,6 +111,9 @@ export default function AppRoutes() {
           />
           <Route path="/profile" element={<ProfilePage />} />
         </Route>
+
+        <Route path="/blocked-accounts" element={<ScreenLayout><BlockedAccountsPage /></ScreenLayout>} />
+        <Route path="/moderation/reports" element={<ScreenLayout><ModerationReportsPage /></ScreenLayout>} />
 
         <Route path="/search" element={<ScreenLayout><SearchStudentsPage /></ScreenLayout>} />
         <Route path="/create" element={<ScreenLayout close flex><CreatePostPage /></ScreenLayout>} />

@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import Avatar from "../components/common/Avatar";
+import ContentSafetyMenu from "../components/safety/ContentSafetyMenu";
+import ConfirmDialog from "../components/common/ConfirmDialog";
 import PostCard from "../components/feed/PostCard";
 import { useAuth } from "../hooks/useAuth";
 import { usePeople } from "../hooks/usePeople";
@@ -50,6 +52,8 @@ export default function PostDetailPage() {
   const [commentText, setCommentText] = useState("");
   const [sendingComment, setSendingComment] = useState(false);
   const [deletingCommentId, setDeletingCommentId] = useState(null);
+  const [pendingDeleteComment, setPendingDeleteComment] = useState(null);
+  const deleteTriggerRef = useRef(null);
   const commentSectionRef = useRef(null);
   const commentInputRef = useRef(null);
 
@@ -219,8 +223,15 @@ export default function PostDetailPage() {
     );
   }
 
-  async function handleDeleteComment(comment) {
-    if (deletingCommentId) return;
+  function handleDeleteComment(comment, triggerElement) {
+    if (deletingCommentId || !comment) return;
+    deleteTriggerRef.current = triggerElement || commentInputRef.current;
+    setPendingDeleteComment(comment);
+  }
+
+  async function confirmDeleteComment() {
+    const comment = pendingDeleteComment;
+    if (!comment || deletingCommentId) return;
     setDeletingCommentId(comment.id);
 
     try {
@@ -228,6 +239,8 @@ export default function PostDetailPage() {
       setComments((previous) => (previous || []).filter((item) => item.id !== comment.id));
       adjustCommentCount(-1);
       showToast("Reply deleted");
+      deleteTriggerRef.current = commentInputRef.current;
+      setPendingDeleteComment(null);
     } catch (error) {
       console.error("Delete post reply failed:", error);
       showToast("Couldn't delete that reply — try again", "error");
@@ -278,7 +291,7 @@ export default function PostDetailPage() {
           <PostCard
             post={visiblePost}
             openOnClick={false}
-            showPostMenu={false}
+            showPostMenu={visiblePost.authorId !== currentUser?.id}
             onLike={handleLike}
             onOpenComments={focusComments}
           />
@@ -321,17 +334,26 @@ export default function PostDetailPage() {
                         </div>
                         <div className="post-detail-comment-text">{comment.text}</div>
                       </div>
-                      {canDeleteComment(comment) && (
-                        <button
-                          type="button"
-                          className="post-detail-comment-delete"
-                          onClick={() => handleDeleteComment(comment)}
-                          disabled={deletingCommentId === comment.id}
-                          aria-label="Delete reply"
-                        >
-                          {deletingCommentId === comment.id ? "Deleting…" : "Delete"}
-                        </button>
-                      )}
+                      <ContentSafetyMenu
+                        targetType="reply"
+                        targetId={comment.id}
+                        reportedUserId={comment.authorId}
+                        targetAuthorId={comment.authorId}
+                        targetUsername={comment.authorUsername}
+                        targetLabel="reply"
+                        canDeleteTarget={canDeleteComment(comment)}
+                        onDelete={(triggerElement) => handleDeleteComment(comment, triggerElement)}
+                        onBlocked={(blockedUserId) => {
+                          const removedCount = (comments || []).filter((item) => item.authorId === blockedUserId).length;
+                          setComments((previous) => (previous || []).filter((item) => item.authorId !== blockedUserId));
+                          if (visiblePost?.authorId === blockedUserId) {
+                            if (location.key === "default") navigate("/feed", { replace: true });
+                            else navigate(-1);
+                            return;
+                          }
+                          if (removedCount > 0) adjustCommentCount(-removedCount);
+                        }}
+                      />
                     </article>
                   );
                 })
@@ -362,6 +384,17 @@ export default function PostDetailPage() {
           </section>
         </>
       ) : null}
+      <ConfirmDialog
+        open={!!pendingDeleteComment}
+        title="Delete reply?"
+        message="This will permanently remove the reply. Its moderation report, if any, will be retained."
+        confirmLabel="Delete reply"
+        cancelLabel="Cancel"
+        busy={Boolean(deletingCommentId)}
+        onCancel={() => setPendingDeleteComment(null)}
+        onConfirm={confirmDeleteComment}
+        returnFocusRef={deleteTriggerRef}
+      />
     </div>
   );
 }

@@ -1,5 +1,6 @@
 import { useEffect, useId, useRef, useState } from "react";
 import ConfirmDialog from "../common/ConfirmDialog";
+import ContentSafetyMenu from "../safety/ContentSafetyMenu";
 import { useAuth } from "../../hooks/useAuth";
 import { usePosts } from "../../hooks/usePosts";
 import { useToast } from "../../hooks/useToast";
@@ -63,7 +64,18 @@ export default function PostMenu({ post, onEdit }) {
     };
   }, [open]);
 
-  if (!isOwner) return null;
+  if (!isOwner) {
+    return (
+      <ContentSafetyMenu
+        targetType="post"
+        targetId={post.id}
+        reportedUserId={post.authorId}
+        targetAuthorId={post.authorId}
+        targetUsername={post.authorUsername}
+        targetLabel="post"
+      />
+    );
+  }
 
   function handleEdit() {
     setOpen(false);
