@@ -5,6 +5,8 @@ import { readFile } from "node:fs/promises";
 const root = new URL("../", import.meta.url);
 const migrationUrl = new URL("supabase/migrations/20261012195000_settings_account_deletion_backend.sql", root);
 const targetCleanupMigrationUrl = new URL("supabase/migrations/20261012211000_account_deletion_target_reference_cleanup.sql", root);
+const pushRegistrationGuardMigrationUrl = new URL("supabase/migrations/20261012211500_guard_push_registration_during_account_deletion.sql", root);
+const pushSubscriptionsUrl = new URL("supabase/functions/push-subscriptions/index.ts", root);
 const reviewerRedactionMigrationUrl = new URL("supabase/migrations/20261012210000_account_deletion_reviewer_redaction.sql", root);
 const preferencesMigrationUrl = new URL("supabase/migrations/20261012180000_settings_notification_preferences.sql", root);
 const masterMigrationUrl = new URL("supabase/migrations/20261012180500_notification_preferences_master_push.sql", root);
@@ -99,6 +101,19 @@ test("storage cleanup is owner-folder-scoped and checks shared references before
   assert.match(fn, /processDeferredMedia/);
   assert.match(migration, /public\.account_deletion_media_is_referenced/);
   assert.match(migration, /ON CONFLICT\(bucket_id,object_path\)/);
+});
+
+test("push subscription registration rejects deleted/in-progress accounts in the trusted RPC", async () => {
+  const [migration, edge] = await Promise.all([
+    readFile(pushRegistrationGuardMigrationUrl, "utf8"),
+    readFile(pushSubscriptionsUrl, "utf8"),
+  ]);
+  assert.match(migration, /NOT EXISTS \(SELECT 1 FROM public\.profiles p WHERE p\.id=p_user_id\)/i);
+  assert.match(migration, /NOT EXISTS \(SELECT 1 FROM auth\.users u WHERE u\.id=p_user_id\)/i);
+  assert.match(migration, /FROM private\.account_deletion_jobs j[\s\S]*?j\.status NOT IN/i);
+  assert.match(edge, /authClient\.auth\.getUser\(tokenMatch\[1\]\)/);
+  assert.match(edge, /account unavailable\|account is being deleted/i);
+  assert.match(edge, /account_unavailable/);
 });
 
 test("contract describes finite retention and does not overstate complete deletion", async () => {
