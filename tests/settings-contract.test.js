@@ -60,7 +60,9 @@ test("push dispatcher enforces persisted category preferences without deleting i
   assert.match(dispatcher, /comment: "push_comments"/);
   assert.match(dispatcher, /reply: "push_replies"/);
   assert.match(dispatcher, /follow: "push_follows"/);
-  assert.match(dispatcher, /preferences\[preferenceField\] === false/);
+  assert.match(dispatcher, /preferences\?\.\[preferenceField\] === false/);
+  assert.match(dispatcher, /preferences\?\.push_enabled === false/);
+  assert.match(dispatcher, /user_disabled_push_master/);
   assert.match(contract, /underlying `public\.notifications` rows[\s\S]*?remain unchanged/i);
 });
 
