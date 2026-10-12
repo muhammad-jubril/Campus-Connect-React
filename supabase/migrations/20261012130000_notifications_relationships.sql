@@ -396,6 +396,23 @@ CREATE TRIGGER follows_notify_recipient
 AFTER INSERT ON public.follows
 FOR EACH ROW EXECUTE FUNCTION public.notify_on_follow_relationship();
 
+-- One server-owned configuration row controls push eligibility and the
+-- quiet-window duration. Disabling it never disables in-app notification rows.
+CREATE TABLE IF NOT EXISTS public.notification_push_config (
+  singleton boolean PRIMARY KEY DEFAULT true CHECK (singleton),
+  enabled boolean NOT NULL DEFAULT true,
+  quiet_window_seconds integer NOT NULL DEFAULT 60
+    CHECK (quiet_window_seconds BETWEEN 1 AND 3600),
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+INSERT INTO public.notification_push_config (singleton, enabled, quiet_window_seconds)
+VALUES (true, true, 60)
+ON CONFLICT (singleton) DO NOTHING;
+
+ALTER TABLE public.notification_push_config ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON TABLE public.notification_push_config FROM PUBLIC, anon, authenticated;
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.notification_push_config TO service_role;
+
 -- Reuse the existing push notification queue and its advisory-lock quiet window.
 -- Replies group by the root thread, follows by the recipient profile, likes and
 -- top-level comments by post. Push aggregation never replaces in-app rows.
@@ -407,12 +424,21 @@ SET search_path = ''
 AS $$
 DECLARE
   v_group_key text;
+  v_quiet_seconds integer;
 BEGIN
   IF NEW.recipient_id IS NULL OR NEW.actor_id IS NULL OR NEW.actor_id = NEW.recipient_id THEN
     RETURN NEW;
   END IF;
 
   IF public.is_notification_pair_blocked(NEW.recipient_id, NEW.actor_id) THEN
+    RETURN NEW;
+  END IF;
+
+  SELECT c.quiet_window_seconds
+  INTO v_quiet_seconds
+  FROM public.notification_push_config c
+  WHERE c.singleton = true AND c.enabled = true;
+  IF NOT FOUND THEN
     RETURN NEW;
   END IF;
 
@@ -444,8 +470,10 @@ BEGIN
   IF NOT FOUND THEN
     INSERT INTO public.push_notification_queue
       (recipient_id, group_key, latest_notification_id, activity_count, first_activity_at, last_activity_at, deliver_after)
-    VALUES
-      (NEW.recipient_id, v_group_key, NEW.id, 1, NEW.created_at, NEW.created_at, NEW.created_at + interval '60 seconds');
+    VALUES (
+      NEW.recipient_id, v_group_key, NEW.id, 1, NEW.created_at, NEW.created_at,
+      GREATEST(NEW.created_at, clock_timestamp()) + make_interval(secs => v_quiet_seconds)
+    );
   END IF;
 
   RETURN NEW;
