@@ -1,0 +1,289 @@
+/* Additive styling for profile connections. The existing campus identity card,
+   edit controls, blocked-account entry point, and post feed remain unchanged. */
+
+.profile-page .profile-stats {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  align-items: stretch;
+}
+
+.profile-page .profile-stats > * {
+  min-width: 0;
+  padding: 2px 3px;
+  text-align: center;
+  border-right: 1px solid var(--cc-border);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+}
+
+.profile-page .profile-stats > *:last-child {
+  border-right: 0;
+}
+
+.profile-page .profile-stats > .profile-stat-link {
+  appearance: none;
+  width: 100%;
+  margin: 0;
+  background: transparent;
+  color: var(--ink);
+  border-top: 0;
+  border-bottom: 0;
+  border-left: 0;
+  font: inherit;
+  cursor: pointer;
+  border-radius: 8px;
+  transition: background 0.16s ease, transform 0.16s ease;
+}
+
+.profile-page .profile-stats > .profile-stat-link:hover {
+  background: rgba(30, 92, 62, 0.06);
+}
+
+.profile-page .profile-stats > .profile-stat-link:active {
+  transform: scale(0.97);
+}
+
+.profile-page .profile-stats > .profile-stat-link:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 1px;
+}
+
+.profile-page .profile-stats strong {
+  max-width: 100%;
+  font-size: clamp(10px, 2.5vw, 14px);
+  overflow-wrap: anywhere;
+}
+
+.profile-page .profile-stats span {
+  font-size: clamp(7px, 1.9vw, 9px);
+  white-space: nowrap;
+  letter-spacing: 0.035em;
+}
+
+.profile-card-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  flex: 0 0 auto;
+  min-width: 0;
+}
+
+.profile-follow-btn {
+  min-height: 36px;
+  padding: 0 13px;
+  border: 1px solid var(--primary);
+  border-radius: 11px;
+  background: var(--primary);
+  color: #fff;
+  font: 600 11px/1 'Sora', sans-serif;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background 0.16s ease, color 0.16s ease, transform 0.16s ease;
+}
+
+.profile-follow-btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+}
+
+.profile-follow-btn:active:not(:disabled) {
+  transform: scale(0.97);
+}
+
+.profile-follow-btn.is-following {
+  background: rgba(30, 92, 62, 0.07);
+  color: var(--primary);
+}
+
+.profile-follow-btn:disabled {
+  opacity: 0.62;
+  cursor: not-allowed;
+}
+
+.profile-follow-btn:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 3px;
+}
+
+.profile-follow-inline-error {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  margin: -7px 0 13px;
+  padding: 11px 13px;
+  border: 1px solid rgba(178, 58, 46, 0.17);
+  border-radius: 12px;
+  background: rgba(178, 58, 46, 0.045);
+  color: var(--ink);
+  font-size: 11.5px;
+  line-height: 1.45;
+}
+
+.profile-follow-inline-error button {
+  flex: 0 0 auto;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: var(--primary);
+  font: 600 11px/1.4 'Inter', sans-serif;
+  cursor: pointer;
+}
+
+.profile-connections-page {
+  width: 100%;
+  max-width: 680px;
+  margin: 0 auto;
+  padding-bottom: 24px;
+}
+
+.profile-connections-heading {
+  margin: 2px 0 18px;
+}
+
+.profile-connections-heading .eyebrow {
+  margin-bottom: 6px;
+}
+
+.profile-connections-heading h1 {
+  margin: 0;
+  font-size: clamp(24px, 5vw, 30px);
+  letter-spacing: -0.035em;
+}
+
+.profile-connections-heading .subtitle {
+  margin: 7px 0 0;
+  font-size: 12.5px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.profile-connections-summary {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  margin: 0 2px 8px;
+  color: rgba(28, 27, 23, 0.46);
+  font: 600 10px/1.4 'IBM Plex Mono', monospace;
+}
+
+.profile-connection-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 6px 10px;
+  border: 1px solid var(--cc-border);
+  border-radius: 17px;
+  background: rgba(255, 255, 255, 0.72);
+  box-shadow: 0 10px 26px rgba(18, 60, 40, 0.04);
+}
+
+.profile-connection-row {
+  padding: 12px 6px;
+  border-radius: 11px;
+}
+
+.profile-connection-row + .profile-connection-row {
+  border-top: 1px solid rgba(28, 27, 23, 0.045);
+}
+
+.profile-connections-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-height: 168px;
+  padding: 26px 18px;
+  border: 1px solid var(--cc-border);
+  border-radius: 17px;
+  background: rgba(255, 255, 255, 0.55);
+  text-align: center;
+  color: rgba(28, 27, 23, 0.52);
+  font-size: 12.5px;
+}
+
+.profile-connections-state p {
+  margin: 0;
+  max-width: 380px;
+  line-height: 1.55;
+}
+
+.profile-connections-state .btn {
+  width: auto;
+  min-width: 120px;
+}
+
+.profile-connections-state .empty-state-icon {
+  width: 42px;
+  height: 42px;
+  display: grid;
+  place-items: center;
+  margin: 0 auto 2px;
+  border-radius: 14px;
+  background: rgba(30, 92, 62, 0.07);
+  color: var(--primary);
+  font-size: 20px;
+}
+
+.profile-connections-inline-error {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+  color: rgba(178, 58, 46, 0.95);
+  font-size: 11.5px;
+  line-height: 1.45;
+}
+
+.profile-connections-inline-error .btn {
+  width: auto;
+  min-width: 64px;
+}
+
+.profile-connections-load-more {
+  display: block;
+  width: auto;
+  min-width: 140px;
+  margin: 16px auto 0;
+}
+
+@media (max-width: 420px) {
+  .profile-page .profile-stats {
+    padding-left: 2px;
+    padding-right: 2px;
+  }
+
+  .profile-page .profile-stats > * {
+    padding-left: 1px;
+    padding-right: 1px;
+  }
+
+  .profile-page .profile-stats span {
+    letter-spacing: 0;
+    font-size: 7px;
+  }
+
+  .profile-card-heading {
+    gap: 7px;
+  }
+
+  .profile-card-heading .display {
+    font-size: 20px;
+  }
+
+  .profile-card-actions {
+    gap: 5px;
+  }
+
+  .profile-follow-btn {
+    min-height: 33px;
+    padding: 0 9px;
+    font-size: 10px;
+  }
+}

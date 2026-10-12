@@ -1,24 +1,19 @@
 {
+  "name": "campus-connect-profile-following-frontend",
+  "version": 1,
+  "baseRepository": "muhammad-jubril/Campus-Connect-React",
+  "baseBranch": "main",
   "files": [
-    "NOTIFICATIONS-BACKEND-CONTRACT.md",
-    "README-NOTIFICATIONS-FRONTEND.md",
-    "public/push-sw.js",
-    "src/components/layout/AppLayout.jsx",
-    "src/components/layout/BottomNav.jsx",
-    "src/components/notifications/NotificationBadge.jsx",
-    "src/components/notifications/NotificationItem.jsx",
-    "src/components/notifications/NotificationList.jsx",
-    "src/hooks/useNotifications.js",
-    "src/hooks/useNotifications.jsx",
-    "src/pages/NotificationsPage.jsx",
+    "src/pages/ProfilePage.jsx",
+    "src/pages/ProfileConnectionsPage.jsx",
     "src/routes/AppRoutes.jsx",
-    "src/services/pushNotifications.js",
-    "src/services/supabase/notifications.js",
-    "src/styles/notifications.css",
-    "src/utils/notificationGrouping.js",
-    "tests/notification-grouping.test.js",
-    "vite.config.js"
+    "src/services/supabase/profileFollows.js",
+    "src/styles/profile-following.css",
+    "src/utils/followRelationshipErrors.js",
+    "tests/profile-following-errors.test.js",
+    "PROFILE-FOLLOWING-BACKEND-CONTRACT.md",
+    "README-PROFILE-FOLLOWING-FRONTEND.md"
   ],
-  "sourceSnapshot": "Campus-Connect-React main inspected 2026-10-12",
-  "note": "The src/hooks/useNotifications.js compatibility bridge is included to avoid resolving the pre-existing empty .js stub instead of the JSX implementation. No git operations performed. Existing files in this ZIP replace the same paths."
+  "backendImplementedInThisPatch": false,
+  "commitOrPushPerformed": false
 }

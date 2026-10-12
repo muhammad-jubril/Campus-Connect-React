@@ -22,6 +22,7 @@ import FeedPage from "../pages/FeedPage";
 import PostDetailPage from "../pages/PostDetailPage";
 import CreatePostPage from "../pages/CreatePostPage";
 import ProfilePage from "../pages/ProfilePage";
+import ProfileConnectionsPage from "../pages/ProfileConnectionsPage";
 import EditProfilePage from "../pages/EditProfilePage";
 import SearchStudentsPage from "../pages/SearchStudentsPage";
 import MarketplacePage from "../pages/MarketplacePage";
@@ -108,6 +109,7 @@ export default function AppRoutes() {
         <Route path="/search" element={<ScreenLayout><SearchStudentsPage /></ScreenLayout>} />
         <Route path="/create" element={<ScreenLayout close flex><CreatePostPage /></ScreenLayout>} />
         <Route path="/profile/edit" element={<ScreenLayout flex><EditProfilePage /></ScreenLayout>} />
+        <Route path="/profile/:username/:connectionType" element={<ScreenLayout><ProfileConnectionsPage /></ScreenLayout>} />
         <Route path="/profile/:username" element={<ScreenLayout><ProfilePage /></ScreenLayout>} />
         <Route path="/groups" element={<ScreenLayout><ComingSoonPage title="Groups" blurb="Find and join student groups around campus — coming soon." icon={icon("M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M22 21v-2a4 4 0 0 0-3-3.87M9 7a4 4 0 1 0 0-8 4 4 0 0 0 0 8M16 3.13a4 4 0 0 1 0 7.75")} /></ScreenLayout>} />
         <Route path="/communities" element={<ScreenLayout><ComingSoonPage title="Communities" blurb="Discover campus communities and shared interests — coming soon." icon={icon("M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.5 8.5 0 0 1 4.7-7.6")} /></ScreenLayout>} />
