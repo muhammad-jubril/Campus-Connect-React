@@ -29,3 +29,13 @@ test("username field focus is represented by its wrapper without a duplicate inn
   assert.match(css, /\.username-field input:focus[\s\S]*?box-shadow:\s*none/);
   assert.match(css, /\.username-field input:focus[\s\S]*?outline:\s*none/);
 });
+
+test("mobile taps suppress the browser tap highlight without disabling focus styles", async () => {
+  const css = await source("src/styles/globals.css");
+  const mobileBlock = css.match(/@media \(max-width:\s*767px\)\s*\{([\s\S]*?)\n\}/)?.[1];
+
+  assert.ok(mobileBlock, "expected a mobile-only CSS block");
+  assert.match(mobileBlock, /\*,\s*\*::before,\s*\*::after\s*\{\s*-webkit-tap-highlight-color:\s*transparent\s*;/);
+  assert.doesNotMatch(css, /(?:^|\n)\s*\*\s*\{[^}]*outline:\s*none/s);
+});
+

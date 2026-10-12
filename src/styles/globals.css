@@ -89,6 +89,14 @@
    the auth form panel), while the app shell stays aligned to the visible viewport.
 */
 @media (max-width: 767px) {
+  /* Remove the browser's default blue/grey touch flash in the mobile PWA.
+     This affects tap highlighting only; keyboard focus indicators remain intact. */
+  *,
+  *::before,
+  *::after {
+    -webkit-tap-highlight-color: transparent;
+  }
+
   html,
   body,
   #root {
