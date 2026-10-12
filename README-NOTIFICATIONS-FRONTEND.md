@@ -15,6 +15,7 @@ The backend relationship migration now adds `comments.parent_comment_id` and `pu
 
 - For a reply, send the parent comment ID as `parent_comment_id` with the existing comment insert. Leave it null for a top-level comment.
 - For follow/unfollow, insert/delete `public.follows` rows. Insert only `following_id`; the backend derives `follower_id` from the signed-in session.
+- In `src/services/pushNotifications.js`, direct `fetch` calls to Supabase Edge Functions must include `apikey: import.meta.env.VITE_SUPABASE_ANON_KEY` alongside `Authorization: Bearer <session access token>`; the subscription function's CORS policy already allows `apikey`. Do not put a secret/service-role key in the frontend.
 - Do not write to `public.notifications` in browser code. The database triggers generate all event rows and preserve their IDs.
 - For reply notification rows, both `comment_id` and `thread_id` contain the root/top-level comment ID to match the current grouping helper. The source `comments.parent_comment_id` remains the immediate reply parent.
 
