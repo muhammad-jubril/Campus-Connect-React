@@ -63,7 +63,7 @@ test("push dispatcher enforces persisted category preferences without deleting i
   assert.match(dispatcher, /preferences\?\.\[preferenceField\] === false/);
   assert.match(dispatcher, /preferences\?\.push_enabled === false/);
   assert.match(dispatcher, /user_disabled_push_master/);
-  assert.match(contract, /underlying `public\.notifications` rows[\s\S]*?remain unchanged/i);
+  assert.match(contract, /does not delete or mutate `public\.notifications`/i);
 });
 
 test("account deletion requires explicit confirmation and server-confirmed completion", async () => {
