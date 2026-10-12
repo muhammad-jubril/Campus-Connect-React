@@ -4,7 +4,7 @@ import { readFile } from "node:fs/promises";
 import { groupNotifications } from "../src/utils/notificationGrouping.js";
 
 const root = new URL("../", import.meta.url);
-const migrationUrl = new URL("supabase/migrations/20261012120000_notifications_push_pipeline.sql", root);
+const migrationUrl = new URL("supabase/migrations/20261012140537_notifications_push_pipeline.sql", root);
 const subscribeUrl = new URL("supabase/functions/push-subscriptions/index.ts", root);
 const dispatchUrl = new URL("supabase/functions/dispatch-push-notifications/index.ts", root);
 const setupUrl = new URL("supabase/diagnostics/push-dispatch-setup.md", root);
