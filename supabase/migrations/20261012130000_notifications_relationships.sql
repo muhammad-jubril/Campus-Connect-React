@@ -428,7 +428,7 @@ CREATE TABLE IF NOT EXISTS public.notification_push_config (
   updated_at timestamptz NOT NULL DEFAULT now()
 );
 INSERT INTO public.notification_push_config (singleton, enabled, quiet_window_seconds)
-VALUES (true, true, 60)
+VALUES (true, false, 60)
 ON CONFLICT (singleton) DO NOTHING;
 
 ALTER TABLE public.notification_push_config ENABLE ROW LEVEL SECURITY;
