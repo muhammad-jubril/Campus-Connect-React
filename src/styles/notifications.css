@@ -200,15 +200,26 @@
   outline-offset: 2px;
 }
 
+/* Reserve the full rendered avatar stack. Previously this area was fixed to
+   43px (37px on phones), while the layered circles extended beyond it and sat
+   underneath the notification text. */
+.notification-card--avatars-0 { --notification-avatar-space: 0px; }
+.notification-card--avatars-1 { --notification-avatar-space: 29px; }
+.notification-card--avatars-2 { --notification-avatar-space: 53px; }
+.notification-card--avatars-3 { --notification-avatar-space: 77px; }
+.notification-card--avatars-4 { --notification-avatar-space: 99px; }
+
 .notification-avatars {
   display: flex;
   align-items: center;
-  flex: 0 0 43px;
-  min-width: 43px;
-  padding-left: 1px;
+  flex: 0 0 var(--notification-avatar-space, 77px);
+  width: var(--notification-avatar-space, 77px);
+  min-width: var(--notification-avatar-space, 77px);
+  box-sizing: border-box;
 }
 
 .notification-avatar-wrap {
+  box-sizing: border-box;
   flex: 0 0 auto;
   width: 29px;
   height: 29px;
@@ -218,7 +229,7 @@
   background: #fff;
 }
 .notification-avatar-wrap:first-child { margin-left: 0; }
-.notification-avatar-wrap .notification-avatar { width: 100%; height: 100%; }
+.notification-avatar-wrap .notification-avatar { flex: 0 0 100%; width: 100%; height: 100%; }
 
 .notification-avatar {
   display: inline-grid;
@@ -239,6 +250,8 @@
 }
 
 .notification-avatar-extra {
+  box-sizing: border-box;
+  flex: 0 0 27px;
   width: 27px;
   height: 27px;
   margin-left: -5px;
@@ -285,7 +298,7 @@
   align-items: center;
   flex-wrap: wrap;
   gap: 13px;
-  padding: 0 17px 12px 73px;
+  padding: 0 17px 12px calc(17px + var(--notification-avatar-space, 43px) + 13px);
 }
 
 .notification-text-button {
@@ -459,10 +472,15 @@
   .notifications-list-heading p { font-size: 11px; }
   .notifications-list-heading > button { font-size: 10.5px; }
   .notification-summary-button { gap: 10px; padding: 14px 12px 10px; }
-  .notification-avatars { flex-basis: 37px; min-width: 37px; }
+  .notification-card--avatars-0 { --notification-avatar-space: 0px; }
+  .notification-card--avatars-1 { --notification-avatar-space: 26px; }
+  .notification-card--avatars-2 { --notification-avatar-space: 47px; }
+  .notification-card--avatars-3 { --notification-avatar-space: 68px; }
+  .notification-card--avatars-4 { --notification-avatar-space: 90px; }
   .notification-avatar-wrap { width: 26px; height: 26px; }
+  .notification-avatar-extra { width: 27px; height: 27px; flex-basis: 27px; }
   .notification-summary-text { font-size: 12.5px; }
-  .notification-item-actions { padding-left: 59px; padding-right: 12px; }
+  .notification-item-actions { padding-left: calc(12px + var(--notification-avatar-space, 68px) + 10px); padding-right: 12px; }
   .notification-activity-list { margin: 0 8px 8px; padding: 2px 8px; }
   .notification-activity-row { gap: 7px; }
 }

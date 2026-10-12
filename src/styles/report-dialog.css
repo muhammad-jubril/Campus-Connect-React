@@ -1,0 +1,44 @@
+/* A report-details field should use the same soft, rounded form treatment as
+   the rest of Campus Connect rather than the browser's default textarea. */
+.content-report-dialog .field textarea {
+  display: block;
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  min-height: 104px;
+  padding: 12px 14px;
+  border: 1.5px solid var(--line);
+  border-radius: 12px 18px 18px 18px;
+  background: rgba(255, 255, 255, 0.78);
+  color: var(--ink);
+  font: 400 13px/1.5 'Inter', system-ui, sans-serif;
+  resize: vertical;
+  outline: none;
+  box-shadow: 0 8px 22px rgba(28, 27, 23, 0.035);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+}
+
+.content-report-dialog .field textarea::placeholder {
+  color: rgba(28, 27, 23, 0.42);
+  opacity: 1;
+}
+
+.content-report-dialog .field textarea:focus {
+  border-color: var(--primary);
+  background: var(--surface);
+  box-shadow: 0 0 0 4px rgba(30, 92, 62, 0.1);
+}
+
+.content-report-dialog .field textarea:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+  resize: none;
+}
+
+.content-report-dialog .field .post-char-count {
+  margin-top: 6px;
+  text-align: right;
+  color: rgba(28, 27, 23, 0.42);
+  font-size: 11px;
+  line-height: 1.4;
+}

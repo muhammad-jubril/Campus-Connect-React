@@ -16,9 +16,12 @@ function ActorAvatar({ actor }) {
 export default function NotificationItem({ group, onOpenGroup, onOpenItem, onMarkItemRead, onMarkGroupRead }) {
   const [expanded, setExpanded] = useState(false);
   const previewActors = group.actors.slice(0, 3);
+  // The avatar stack can show three people plus a "+N" badge. Expose its
+  // actual visible count so the layout can reserve enough room for every icon.
+  const avatarCount = previewActors.length + (group.actors.length > 3 ? 1 : 0);
 
   return (
-    <article className={`notification-card${group.isUnread ? " is-unread" : ""}`}>
+    <article className={`notification-card${group.isUnread ? " is-unread" : ""} notification-card--avatars-${avatarCount}`}>
       <button
         type="button"
         className="notification-summary-button"

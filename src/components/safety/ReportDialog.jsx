@@ -2,6 +2,7 @@ import { useEffect, useId, useRef, useState } from "react";
 import { REPORT_REASONS, MAX_CONTENT_REPORT_DETAILS, validateContentReportDraft } from "../../utils/contentSafetyRules";
 import { submitContentReport } from "../../services/supabase/contentSafety";
 import { useToast } from "../../hooks/useToast";
+import "../../styles/report-dialog.css";
 
 const FOCUSABLE = 'button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
