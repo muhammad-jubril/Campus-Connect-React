@@ -49,7 +49,7 @@ test("follows derive the follower from auth.uid and apply self-follow/block rest
   assert.match(sql, /follower_id = \(select auth\.uid\(\)\)[\s\S]*?following_id <> \(select auth\.uid\(\)\)[\s\S]*?not public\.is_user_blocked\(following_id\)/i);
   assert.match(sql, /function public\.notify_on_follow_relationship\(\)/i);
   assert.match(sql, /type, profile_id, source_id, read, created_at/i);
-  assert.match(sql, /public\\.is_notification_pair_blocked\\(new\\.follower_id, new\\.following_id\\)/i);
+  assert.match(sql, /public\.is_notification_pair_blocked\(new\.follower_id, new\.following_id\)/i);
 });
 
 test("notification RLS hides blocked actors and clients can update only read state", async () => {
