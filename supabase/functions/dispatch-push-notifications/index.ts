@@ -162,8 +162,7 @@ Deno.serve(async (request: Request): Promise<Response> => {
       }
 
       // The dispatcher enforces the account master switch and category preference
-      // immediately before sending, using the values currently saved in the account row.
-      // Suppressing push never changes or deletes the in-app notification/activity.
+      // on the trusted path. Suppression never deletes in-app notification history.
       const preferenceColumn: Record<string, string> = {
         like: "push_likes",
         comment: "push_comments",
