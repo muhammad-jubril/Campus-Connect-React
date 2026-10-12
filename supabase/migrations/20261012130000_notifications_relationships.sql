@@ -215,7 +215,7 @@ GRANT UPDATE (read) ON TABLE public.notifications TO authenticated;
 
 -- Rebuild every UPDATE policy, not just a known legacy name: permissive
 -- RLS policies are OR-combined, so an unknown older UPDATE policy must not survive.
-DO $
+DO $$
 DECLARE p record;
 BEGIN
   FOR p IN
@@ -228,8 +228,7 @@ BEGIN
     EXECUTE format('DROP POLICY IF EXISTS %I ON public.notifications', p.policyname);
   END LOOP;
 END
-$;
-
+$$;
 CREATE POLICY notifications_update_read_own
 ON public.notifications FOR UPDATE TO authenticated
 USING (recipient_id = (SELECT auth.uid()))
