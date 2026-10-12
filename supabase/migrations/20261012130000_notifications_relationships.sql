@@ -213,7 +213,7 @@ $$;
 GRANT SELECT ON TABLE public.notifications TO authenticated;
 GRANT UPDATE (read) ON TABLE public.notifications TO authenticated;
 
-DO $
+DO $$
 DECLARE p record;
 BEGIN
   FOR p IN
@@ -223,6 +223,7 @@ BEGIN
     EXECUTE format('DROP POLICY IF EXISTS %I ON public.notifications', p.policyname);
   END LOOP;
 END
+$$;
 $;
 
 CREATE POLICY notifications_select_own
