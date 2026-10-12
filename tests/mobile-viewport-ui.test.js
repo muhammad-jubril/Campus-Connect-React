@@ -30,12 +30,23 @@ test("username field focus is represented by its wrapper without a duplicate inn
   assert.match(css, /\.username-field input:focus[\s\S]*?outline:\s*none/);
 });
 
-test("mobile taps suppress the browser tap highlight without disabling focus styles", async () => {
+test("mobile taps force-disable browser tap highlights across nested controls and SVG icons", async () => {
   const css = await source("src/styles/globals.css");
   const mobileBlock = css.match(/@media \(max-width:\s*767px\)\s*\{([\s\S]*?)\n\}/)?.[1];
 
   assert.ok(mobileBlock, "expected a mobile-only CSS block");
-  assert.match(mobileBlock, /\*,\s*\*::before,\s*\*::after\s*\{\s*-webkit-tap-highlight-color:\s*transparent\s*;/);
-  assert.doesNotMatch(css, /(?:^|\n)\s*\*\s*\{[^}]*outline:\s*none/s);
+  assert.match(mobileBlock, /#root\s*,\s*#root \*,\s*#root \*::before,\s*#root \*::after[\s\S]*?-webkit-tap-highlight-color:\s*transparent\s*!important/);
+});
+
+test("mobile pointer focus removes native blue outlines while preserving keyboard focus-visible and input focus", async () => {
+  const css = await source("src/styles/globals.css");
+  const mobileBlock = css.match(/@media \(max-width:\s*767px\)\s*\{([\s\S]*?)\n\}/)?.[1];
+
+  assert.ok(mobileBlock, "expected a mobile-only CSS block");
+  assert.match(mobileBlock, /button:focus:not\(:focus-visible\)/);
+  assert.match(mobileBlock, /a:focus:not\(:focus-visible\)/);
+  assert.match(mobileBlock, /outline:\s*none\s*!important/);
+  assert.doesNotMatch(mobileBlock, /(?:^|[,\n])\s*(?:input|textarea|select):focus:not\(:focus-visible\)/);
+  assert.doesNotMatch(mobileBlock, /:focus-visible\s*\{[^}]*outline:\s*none/s);
 });
 

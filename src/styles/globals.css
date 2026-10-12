@@ -89,12 +89,30 @@
    the auth form panel), while the app shell stays aligned to the visible viewport.
 */
 @media (max-width: 767px) {
-  /* Remove the browser's default blue/grey touch flash in the mobile PWA.
-     This affects tap highlighting only; keyboard focus indicators remain intact. */
-  *,
-  *::before,
-  *::after {
-    -webkit-tap-highlight-color: transparent;
+  /* Android Chrome/WebKit can show a browser tap flash even on nested SVGs
+     inside icon buttons. Apply the reset to the app tree with !important so
+     component-level styles cannot accidentally reintroduce the default color. */
+  html,
+  body,
+  #root,
+  #root *,
+  #root *::before,
+  #root *::after {
+    -webkit-tap-highlight-color: transparent !important;
+  }
+
+  /* A touch tap may leave a native blue focus ring on buttons and links after
+     the tap flash. Remove pointer-only focus outlines, while preserving the
+     browser/app focus-visible styles used for keyboard navigation. Inputs keep
+     their own intentional focus styling. */
+  button:focus:not(:focus-visible),
+  a:focus:not(:focus-visible),
+  [role="button"]:focus:not(:focus-visible),
+  [role="menuitem"]:focus:not(:focus-visible),
+  [role="tab"]:focus:not(:focus-visible),
+  summary:focus:not(:focus-visible),
+  [tabindex]:focus:not(:focus-visible) {
+    outline: none !important;
   }
 
   html,
