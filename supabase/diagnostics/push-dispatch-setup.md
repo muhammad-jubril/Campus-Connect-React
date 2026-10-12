@@ -1,63 +1,63 @@
 # Web Push deployment checklist
 
-The app can register a browser subscription only after the `push-subscriptions` Supabase Edge Function and the notification queue migration are deployed. Actual delivery additionally requires the `dispatch-push-notifications` function and a scheduled caller. A successful frontend build does not prove device delivery.
+The backend stores VAPID credentials and its dispatch secret in Supabase Vault. The dispatcher retrieves VAPID material through a service-role-only, dispatch-secret-guarded RPC. Never commit VAPID private keys, dispatch secrets, service-role keys, or real Vault values.
 
-## 1. Apply the migration
+## 1. Migration order
 
-Apply the following migrations in this order through the project's established Supabase migration workflow:
+Apply these migrations in order using the repository's established Supabase migration workflow, only for a project that already has the Campus Connect base schema:
 
-1. `supabase/migrations/20261012140537_notifications_push_pipeline.sql` — the existing queue, subscriptions, receipts, service-role RPCs, retry handling and 60-second initial batching infrastructure.
-2. `supabase/migrations/20261012140543_notifications_relationships.sql` — adds reply parents/thread targets, server-generated per-source notification IDs, the real `public.follows` relation, configurable quiet-window settings, stricter notification RLS/column grants and block-aware selectors.
+1. `supabase/migrations/20261012140537_notifications_push_pipeline.sql` — the existing queue, subscriptions, receipts, retry handling and quiet-window queue infrastructure.
+2. `supabase/migrations/20261012140543_notifications_relationships.sql` — reply-parent and follow relationships, server-generated notification targets and quiet-window settings.
+3. `supabase/migrations/20261012151410_install_push_dispatch_extensions.sql` — enables `pg_cron` and `pg_net`.
+4. `supabase/migrations/20261012151542_notification_push_vault_runtime_access.sql` — creates the initial service-role-only Vault runtime reader and the queue target index.
+5. `supabase/migrations/20261012151640_notification_push_vault_guarded_runtime_config.sql` — replaces that reader with the guarded function that verifies the supplied dispatch secret before returning VAPID material.
 
-They assume the existing notification/security migrations and base tables are already present. Inspect the diff and migration result; do not apply to an unrelated or empty project. Both migrations are forward-only and avoid deleting existing app/activity rows.
+These forward-only migrations do not delete existing notification, like, or comment data.
 
-The pipeline migration adds private `push_subscriptions`, `push_notification_queue`, and `push_delivery_receipts` tables. The relationship migration adds `comments.parent_comment_id`, `public.follows` and `public.notification_push_config`. Only `service_role` can access the private push metadata/config tables directly. Client subscription operations pass through the JWT-authenticated Edge Function and service-role-only RPCs; activity notification rows are never client-inserted.
+## 2. Required Supabase Vault entries
 
-## 2. Configure Edge Function secrets
+Use Vault for these entries; the actual secret values are environment-specific and must never be committed:
 
-Generate a VAPID key pair using a trusted Web Push key generator or `web-push generate-vapid-keys`. Store the values only in Supabase Function Secrets:
+- `campus_connect_project_url`: the project's HTTPS API URL.
+- `campus_connect_anon_jwt`: the project's legacy anon JWT key. The scheduled caller uses it as `apikey` and as `Authorization: Bearer ...` to pass the Edge Function gateway's JWT verification.
+- `campus_connect_push_dispatch_secret`: a random secret of at least 32 characters.
+- `campus_connect_vapid_public_key`: the public half of the VAPID pair.
+- `campus_connect_vapid_private_key`: matching private half; never expose it to the browser.
+- `campus_connect_vapid_subject`: a valid `https://...` or `mailto:...` contact URI.
 
-- `VAPID_PUBLIC_KEY` — public part, also configured as `VITE_WEB_PUSH_PUBLIC_KEY` for Vite.
-- `VAPID_PRIVATE_KEY` — private key; never put this in `VITE_*`, source code, Git, build output, or browser JS.
-- `VAPID_SUBJECT` — a contact URI such as `mailto:admin@example.com`.
-- `PUSH_DISPATCH_SECRET` — random secret of at least 32 characters, shared only with the scheduled caller and dispatch function.
-- `ALLOWED_ORIGINS` — comma-separated allowed browser origins, including the production site and intended development origins.
+The live Campus Connect project has all six named entries. The private key and dispatch secret are not included in browser variables or this repository.
 
-Supabase provides `SUPABASE_URL`, `SUPABASE_ANON_KEY`, and `SUPABASE_SERVICE_ROLE_KEY` to Edge Functions. Do not copy the service-role key into `.env.example` or any Vite variable.
+## 3. Edge Functions and frontend environment
 
-Deploy both functions:
+The `push-subscriptions` and `dispatch-push-notifications` functions must remain deployed with JWT verification enabled. Supabase provides its default `SUPABASE_URL`, `SUPABASE_ANON_KEY`, and `SUPABASE_SERVICE_ROLE_KEY` runtime values to these functions; do not copy the service-role key to Vite.
 
-```sh
-supabase functions deploy push-subscriptions
-supabase functions deploy dispatch-push-notifications
-```
-
-Set frontend configuration in the hosting environment, then rebuild/redeploy:
+The frontend needs these public settings in Vercel, followed by a fresh build/deployment:
 
 ```text
-VITE_WEB_PUSH_PUBLIC_KEY=<public VAPID key>
+VITE_WEB_PUSH_PUBLIC_KEY=<exact value of campus_connect_vapid_public_key in Vault>
 VITE_PUSH_SUBSCRIPTION_ENDPOINT=https://<project-ref>.supabase.co/functions/v1/push-subscriptions
 ```
 
-## 3. Schedule the queue dispatcher
+The public VAPID key in Vercel must match the private key stored in Vault. Never put the private key in a `VITE_*` variable. If using a production origin outside the function's current allow-list, set `ALLOWED_ORIGINS` for `push-subscriptions` to a comma-separated list of the exact HTTPS origins you control.
 
-The queue sets `deliver_after` to the configured `quiet_window_seconds` (default 60; allowed 1–3600) after the first event in a pending group. The setting is seeded with `enabled = false` so activity cannot pile up for delayed delivery before VAPID secrets and the scheduler are configured. Change the window with `UPDATE public.notification_push_config SET quiet_window_seconds = 60, updated_at = now() WHERE singleton = true;`. New activity joins the pending group without moving the initial deadline; once a batch is being processed, later activity starts the next window. Setting `enabled = false` temporarily disables push queuing only; in-app notification/activity rows continue to persist. Configure a one-minute Supabase Cron job (or an authenticated external scheduler) to `POST` to:
+## 4. One-minute dispatcher schedule
 
-`https://<project-ref>.supabase.co/functions/v1/dispatch-push-notifications`
+The live project has a Cron job named `campus-connect-push-dispatch`, scheduled every minute. To recreate/repair it, run `supabase/diagnostics/push-dispatch-cron.sql` as the `postgres` role after the Vault entries exist. The script replaces the job with the same name.
 
-Send `Authorization: Bearer <SUPABASE_SERVICE_ROLE_KEY>` so the Supabase function gateway accepts the request, and `x-push-dispatch-secret: <PUSH_DISPATCH_SECRET>` for the worker's second check. Store both values in Supabase Vault or your scheduler's secret store, never in this repo or SQL committed to Git. Request body may be `{ "limit": 50 }`.
+The scheduled caller sends:
+- `apikey` and `Authorization: Bearer ...` using `campus_connect_anon_jwt` for the function gateway.
+- `x-push-dispatch-secret` using `campus_connect_push_dispatch_secret` for the worker's independent validation.
+- A body such as `{"limit":50}`.
 
-If using Supabase Cron + `pg_net`, store `project_url`, `service_role_key`, and `push_dispatch_secret` in Vault first, enable the `pg_cron`, `pg_net`, and Vault extensions in the project, then run `supabase/diagnostics/push-dispatch-cron.sql` as the `postgres` role. Verify job responses in `cron.job_run_details` and Edge Function logs; the script replaces an existing job with the same name.
+The VAPID private key is not sent as a request header and is not stored as an Edge Function secret. The worker validates the dispatch header against Vault through a restricted RPC, then reads the VAPID pair only after validation.
 
-## 4. Frontend contract handoff
+Verify the job in `cron.job`, its history in `cron.job_run_details`, HTTP results in `net._http_response`, and function logs. A successful job invocation with `claimed: 0` shows the path is responding but does not demonstrate delivery to a device.
 
-The current frontend's grouping code reads `comment_id` before `thread_id`. Accordingly, the relationship migration stores the root/top-level comment ID in both notification fields for a reply, while source comments retain the actual immediate parent in `parent_comment_id`. The frontend agent should wire the reply composer to write `parent_comment_id`, add a follow/unfollow action using only `following_id`, and keep all writes to `public.notifications` out of browser code.
+## 5. Quiet window and safe activation
 
-The existing UI groups follow notices by UTC calendar day. The push queue groups following activity by the followed profile (the recipient) during the 60-second quiet window. Like and top-level comment pushes group per post; replies group per root thread.
+The database config is intentionally `enabled = false` and `quiet_window_seconds = 60`. In-app notification rows continue to be created while push is disabled. The first event fixes its batch deadline; later events join the pending group without moving that deadline. The quiet window accepts 1–3600 seconds.
 
-## 5. Enable push after configuration
-
-After the Edge Function secrets are set, both functions deployed, the scheduler is running and a test push has been accepted by a provider, enable new push queue entries:
+Do not enable push until a supported HTTPS browser has a persisted subscription and a real-device test confirms receipt and correct click navigation. Once tested, enable it explicitly:
 
 ```sql
 update public.notification_push_config
@@ -65,12 +65,19 @@ set enabled = true, updated_at = now()
 where singleton = true;
 ```
 
-Until this explicit step, the in-app notification rows continue to persist, but new push batches are not queued. The 60-second quiet-window value is still ready for configuration.
+## 6. End-to-end test checklist
 
-## 6. Verify live behaviour
+Use two test accounts and at least one supported HTTPS browser/device:
 
-Use two test accounts and a supported HTTPS browser/device. Verify likes and comments queue only for another account, no push before the first 60 seconds, multiple same-group activities coalesce, a new event while a batch is processing enters a later batch, read notifications and newly blocked pairs don't deliver, and a worker retry doesn't re-send devices already recorded as delivered. Disable push on one device and verify only the caller's endpoint is removed. Force a test expired endpoint in a non-production environment and confirm HTTP 404/410 cleanup.
+- A signed-in recipient can persist a subscription through `push-subscriptions` using both the user's Supabase access token and `apikey`.
+- A like/comment creates an in-app notification and push queue entry only when push is enabled.
+- The scheduled dispatcher returns success with correct secrets and rejects a wrong dispatch secret with HTTP 401.
+- A real push arrives after the 60-second window and opens the correct destination when clicked.
+- Multiple devices can register; unsubscribe removes only the caller's endpoint.
+- Read notifications, blocked pairs and hidden targets are suppressed by the dispatcher.
+- Provider HTTP 404/410 removes the expired endpoint.
+- A retry skips devices whose delivery receipts are already marked delivered.
 
-## Important feature boundary
+## 7. Frontend relationship integration
 
-The current repository has no follow table/action and no `comments.parent_comment_id` column or nested-reply UI. The migration attaches follow/reply generators only if a real database schema already has those exact columns/tables. So this package can deliver push for the app's existing likes/comments and supports optional reply/follow events once those product relationships exist; it does not claim the current app generates genuine follow events or nested reply notifications today.
+The backend accepts replies by setting `comments.parent_comment_id` for replies (null for top-level comments) and follows by writing only `following_id` to `public.follows`; the database derives the follower from the authenticated session. The frontend agent must wire these existing contracts and must never insert directly into `public.notifications`.
