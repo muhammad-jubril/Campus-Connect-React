@@ -133,6 +133,41 @@ Deno.serve(async (request: Request): Promise<Response> => {
         continue;
       }
 
+      // Category preferences are stored in Supabase and enforced server-side.
+      // If there is no preference row yet, retain the database defaults (all
+      // categories enabled); an explicit false always suppresses delivery while
+      // leaving the in-app notification untouched.
+      const preferenceColumn: Record<string, string> = {
+        like: "push_likes",
+        comment: "push_comments",
+        reply: "push_replies",
+        follow: "push_follows",
+      };
+      const preferenceField = preferenceColumn[notification.type];
+      if (!preferenceField) {
+        await admin.rpc("finish_push_notification_batch", {
+          p_queue_id: batch.queue_id,
+          p_outcome: "sent",
+          p_error_code: "unsupported_notification_type",
+        });
+        sent++;
+        continue;
+      }
+      const { data: preferences, error: preferencesError } = await admin.from("notification_preferences")
+        .select("push_likes,push_comments,push_replies,push_follows")
+        .eq("user_id", batch.recipient_id)
+        .maybeSingle();
+      if (preferencesError) throw preferencesError;
+      if (preferences && preferences[preferenceField] === false) {
+        await admin.rpc("finish_push_notification_batch", {
+          p_queue_id: batch.queue_id,
+          p_outcome: "sent",
+          p_error_code: `user_disabled_${preferenceField}`,
+        });
+        sent++;
+        continue;
+      }
+
       const { data: subscriptions, error: subscriptionsError } = await admin.from("push_subscriptions")
         .select("id,endpoint,p256dh,auth_secret").eq("user_id", batch.recipient_id);
       if (subscriptionsError) throw subscriptionsError;

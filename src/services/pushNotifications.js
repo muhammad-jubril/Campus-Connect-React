@@ -38,8 +38,8 @@ export function getPushConfiguration() {
   };
 }
 
-function pushError(status, message) {
-  return { status, message };
+function pushError(status, message, extra = {}) {
+  return { status, message, ...extra };
 }
 
 function decodeVapidKey(value) {
@@ -103,33 +103,51 @@ async function getExistingRegistration() {
 
 export async function getPushStatus(userId) {
   const capability = getPushConfiguration();
+  const permission = typeof Notification === "undefined" ? "unsupported" : Notification.permission;
   if (!capability.supported) {
-    return pushError("unsupported", "This browser or connection does not support push notifications. Use a supported browser over HTTPS.");
+    return pushError("unsupported", "This browser or connection does not support push notifications. Use a supported browser over HTTPS.", {
+      permission,
+      subscriptionStatus: "unknown",
+    });
   }
   if (!capability.configured) {
-    return pushError("not-configured", "Push is not connected yet. The backend push endpoint and public VAPID key must be configured first.");
-  }
-  if (Notification.permission === "denied") {
-    return pushError("permission-denied", "Notifications are blocked in your browser settings. Allow them there before enabling push.");
+    return pushError("not-configured", "Push is not connected yet. The backend endpoint and VAPID key must be configured first.", {
+      permission,
+      subscriptionStatus: "unknown",
+    });
   }
 
   try {
     const registration = await getExistingRegistration();
     const subscription = await registration.pushManager.getSubscription();
+
+    // Permission and browser subscription are separate states. A user may revoke
+    // permission in browser settings while the local subscription object remains;
+    // expose that fact so Settings can still offer to remove it safely.
+    if (permission === "denied") {
+      return pushError("permission-denied", "Notifications are blocked in browser settings. A local subscription can still be removed below if one remains.", {
+        permission,
+        subscriptionStatus: subscription ? "present" : "absent",
+      });
+    }
+
     if (!subscription) {
-      return Notification.permission === "granted"
-        ? pushError("disabled", "Push notifications are off on this device.")
-        : pushError("permission-required", "Enable push to ask the browser for notification permission.");
+      return permission === "granted"
+        ? pushError("disabled", "Push notifications are off on this device.", { permission, subscriptionStatus: "absent" })
+        : pushError("permission-required", "Enable push to ask your browser for permission.", { permission, subscriptionStatus: "absent" });
     }
 
     // A local subscription alone is not evidence that the backend has saved it.
     // PUT is an idempotent upsert in the documented backend contract.
     await sendSubscriptionToBackend("PUT", subscription, userId);
-    return pushError("enabled", "Push notifications are enabled on this device.");
+    return pushError("enabled", "Push notifications are enabled on this device.", {
+      permission,
+      subscriptionStatus: "registered",
+    });
   } catch (error) {
     const message = error?.message || "Couldn't verify push registration with the backend.";
     const status = message.includes("service worker is not active") ? "service-worker-not-ready" : "sync-error";
-    return pushError(status, message);
+    return pushError(status, message, { permission, subscriptionStatus: "unknown" });
   }
 }
 
