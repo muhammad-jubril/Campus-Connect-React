@@ -45,7 +45,10 @@ function groupingKey(notification) {
   }
 
   if (type === "follow") {
-    const day = new Date(safeTime(notification.created_at)).toISOString().slice(0, 10);
+    // Missing/invalid timestamps should not all collapse into the Unix epoch day.
+    const timestamp = Date.parse(notification.created_at || "");
+    if (!Number.isFinite(timestamp)) return `single:${notification.id}`;
+    const day = new Date(timestamp).toISOString().slice(0, 10);
     return `follow:day:${day}`;
   }
 

@@ -2,6 +2,27 @@ import { supabase } from "./supabase/client";
 
 const VAPID_PUBLIC_KEY = import.meta.env.VITE_WEB_PUSH_PUBLIC_KEY || "";
 const PUSH_ENDPOINT = import.meta.env.VITE_PUSH_SUBSCRIPTION_ENDPOINT || "";
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || "";
+
+// This endpoint receives the signed-in user's bearer token. Only send that token
+// to the push-subscriptions function on the configured Supabase project; a typo
+// or malicious build-time value must not exfiltrate it to an arbitrary host.
+function isTrustedPushEndpoint(value = PUSH_ENDPOINT) {
+  if (!value || !SUPABASE_URL) return false;
+  try {
+    const endpoint = new URL(value);
+    const supabase = new URL(SUPABASE_URL);
+    const expectedPath = "/functions/v1/push-subscriptions";
+    const isSecure = endpoint.protocol === "https:" || (
+      import.meta.env.DEV && endpoint.protocol === "http:" &&
+      ["localhost", "127.0.0.1", "::1"].includes(endpoint.hostname)
+    );
+    return isSecure && endpoint.origin === supabase.origin && endpoint.pathname.replace(/\/+$/, "") === expectedPath &&
+      !endpoint.username && !endpoint.password && !endpoint.search && !endpoint.hash;
+  } catch {
+    return false;
+  }
+}
 
 export function getPushConfiguration() {
   const supported = typeof window !== "undefined"
@@ -13,7 +34,7 @@ export function getPushConfiguration() {
 
   return {
     supported,
-    configured: Boolean(VAPID_PUBLIC_KEY.trim() && PUSH_ENDPOINT.trim()),
+    configured: Boolean(VAPID_PUBLIC_KEY.trim() && isTrustedPushEndpoint()),
   };
 }
 
@@ -39,7 +60,7 @@ async function getSessionForUser(userId) {
 }
 
 async function sendSubscriptionToBackend(method, subscription, userId) {
-  if (!PUSH_ENDPOINT.trim()) throw new Error("Push subscription service is not configured.");
+  if (!isTrustedPushEndpoint()) throw new Error("Push subscription endpoint must be the push-subscriptions function on the configured Supabase project.");
   const session = await getSessionForUser(userId);
   const body = method === "DELETE"
     ? { endpoint: subscription?.endpoint || null }
@@ -49,6 +70,7 @@ async function sendSubscriptionToBackend(method, subscription, userId) {
     method,
     headers: {
       "Content-Type": "application/json",
+      apikey: import.meta.env.VITE_SUPABASE_ANON_KEY || "",
       Authorization: `Bearer ${session.access_token}`,
     },
     body: JSON.stringify(body),
@@ -164,4 +186,46 @@ export async function disablePushNotifications(userId) {
   const removed = await subscription.unsubscribe();
   if (!removed) throw new Error("The server registration was removed, but the browser could not unsubscribe. Check browser settings and try again.");
   return { status: "disabled", message: "Push notifications are off on this device." };
+}
+
+/** Best-effort server deregistration followed by local unsubscribe before explicit logout. */
+export async function cleanupPushSubscriptionForLogout(userId) {
+  if (typeof navigator === "undefined" || !("serviceWorker" in navigator)) return;
+  let subscription = null;
+  try {
+    const registration = await navigator.serviceWorker.getRegistration();
+    subscription = registration?.pushManager ? await registration.pushManager.getSubscription() : null;
+  } catch (error) {
+    console.warn("Push subscription could not be inspected during logout:", error?.name || "unknown");
+    return;
+  }
+  if (!subscription) return;
+
+  if (userId && isTrustedPushEndpoint()) {
+    try {
+      await sendSubscriptionToBackend("DELETE", subscription, userId);
+    } catch (error) {
+      // Still unsubscribe locally. If the server delete failed, the dispatcher will
+      // receive the provider's expired-endpoint response and remove the stale row.
+      console.warn("Push subscription server cleanup failed during logout:", error?.name || "unknown");
+    }
+  }
+  try {
+    const removed = await subscription.unsubscribe();
+    if (!removed) console.warn("Browser declined push unsubscribe during logout.");
+  } catch (error) {
+    console.warn("Browser push unsubscribe failed during logout:", error?.name || "unknown");
+  }
+}
+
+/** Used after a sign-out observed in another tab or an expired local session. */
+export async function cleanupLocalPushSubscription() {
+  if (typeof navigator === "undefined" || !("serviceWorker" in navigator)) return;
+  try {
+    const registration = await navigator.serviceWorker.getRegistration();
+    const subscription = registration?.pushManager ? await registration.pushManager.getSubscription() : null;
+    if (subscription) await subscription.unsubscribe();
+  } catch (error) {
+    console.warn("Local push cleanup after sign-out failed:", error?.name || "unknown");
+  }
 }

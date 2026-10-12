@@ -166,10 +166,12 @@ export function NotificationsProvider({ children }) {
     if (!userId) throw new Error("Sign in to update notifications.");
     const unreadIds = notificationsRef.current.filter((item) => !item.read).map((item) => item.id);
     await markAllNotificationsRead(userId);
-    setNotifications((previous) => previous.map((item) => ({ ...item, read: true })));
-    setUnreadCount(0);
+    // Fetch the server's state after the mutation instead of marking every currently
+    // cached row read optimistically. A realtime insert racing with this action must
+    // remain unread if it was committed after the UPDATE statement ran.
+    await refreshNotifications({ includeList: true });
     return unreadIds.length;
-  }, [userId]);
+  }, [userId, refreshNotifications]);
 
   return (
     <NotificationsContext.Provider value={{

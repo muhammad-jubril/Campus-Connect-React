@@ -4,6 +4,7 @@ import {
 } from "../services/supabase/auth";
 import { getProfile, personFromProfileRow } from "../services/supabase/profiles";
 import { classifyAuthError } from "../utils/authErrors";
+import { cleanupLocalPushSubscription, cleanupPushSubscriptionForLogout } from "../services/pushNotifications";
 
 export const AuthContext = createContext(null);
 
@@ -130,10 +131,10 @@ export function AuthProvider({ children }) {
       }
 
       if (event === "SIGNED_OUT") {
-        // Supabase emits this for both explicit sign-outs and sessions that
-        // disappear elsewhere (for example another tab or session expiry).
-        // This is the single state transition path, so local logout cannot
-        // race or duplicate the cleanup with a second manual update.
+        // Supabase emits this for explicit and cross-tab/session-expiry sign-outs.
+        // An explicit logout attempts server deregistration before auth is cleared;
+        // this listener also removes any remaining local browser subscription.
+        void cleanupLocalPushSubscription();
         clearSignedOutState();
         return;
       }
@@ -161,6 +162,9 @@ export function AuthProvider({ children }) {
   }
 
   async function logout() {
+    // Best effort, before Supabase clears the access token required by the
+    // authenticated push-subscription deletion endpoint.
+    await cleanupPushSubscriptionForLogout(currentUser?.id || null);
     await supabaseSignOut({ scope: "local" });
   }
 

@@ -1,39 +1,35 @@
-# Notifications frontend patch
+# Campus Connect notifications and Web Push
 
-## What's included
-- Real Notifications route replacing the placeholder.
-- Grouped like/comment/reply/follow presentation while preserving and exposing individual activity rows.
-- Individual, group, and all-as-read actions with the current `notifications` table.
-- Recipient-scoped Supabase Realtime subscription and live unread count in the existing bottom navigation.
-- Mobile/desktop styling matching Campus Connect's existing green/ink/surface variables.
-- A user-controlled push panel with actual browser permission and PushManager checks, explicit unsupported/not-configured/error states, and backend confirmation before claiming push is enabled.
-- Notification-click navigation added by importing `public/push-sw.js` into the existing generated VitePWA service worker. It does not register a second worker.
-- Grouping tests and a backend contract note.
+## Included in the current source
 
-## Apply
-Extract into the project root, preserving the included paths. Existing files are replacements; new files should be added. No SQL migration is included because the task assigns database schema, generation, security, and push delivery to the backend developer.
+- Recipient-scoped notification reads, unread count, read/unread actions, and Supabase Realtime subscription in the existing app layout and bottom navigation.
+- Client presentation grouping for likes and comments by post, replies by their comment/thread, and follows by UTC day. Grouping preserves the original notification row IDs; it does not write combined or synthetic rows to the database.
+- User-initiated Web Push subscription controls using the app's existing VitePWA service worker (`public/push-sw.js` is imported into the generated worker, not registered independently).
+- Forward migration `supabase/migrations/20261012120000_notifications_push_pipeline.sql` for private subscriptions, 60-second push batching, concurrency-safe pending group updates, retry metadata, delivery receipts, and optional hooks for real reply/follow relations where those exist.
+- Supabase Edge Functions to register/remove a signed-in user's push subscription and to dispatch queued Web Push messages.
+- Backend deployment instructions at `supabase/diagnostics/push-dispatch-setup.md` and a review report at `NOTIFICATIONS-AUDIT-REPORT.md`.
 
-## Run locally
-```bash
-npm run build
-npm run lint
+## Important current-schema boundary
+
+The repository's app code has only a post comments feature; the `comments` reads and writes have no `parent_comment_id`/nested-reply relationship. The checked-in project also has no follows table or follow/unfollow action. The migration only attaches those optional generators when a deployed database already has the required schema. As checked in, generated in-app events are likes and post comments, not real follow events or nested-comment replies.
+
+The UI intentionally labels push not configured until both the public VAPID key and the authenticated subscription endpoint are set. A browser subscription alone never proves the server stored it, and no push delivery is claimed until the Edge Functions and scheduler are deployed and a device test succeeds.
+
+## Deploy
+
+1. Apply the notification pipeline migration in the already-initialized Supabase project.
+2. Set Edge Function secrets described in `supabase/diagnostics/push-dispatch-setup.md`, deploy `push-subscriptions` and `dispatch-push-notifications`, and configure a one-minute scheduled caller for the dispatcher.
+3. Set `VITE_WEB_PUSH_PUBLIC_KEY` and `VITE_PUSH_SUBSCRIPTION_ENDPOINT` in the frontend hosting environment, then rebuild/redeploy. The endpoint must be the `push-subscriptions` function on the configured Supabase project; the client rejects other hosts/paths before sending the user's access token.
+4. Verify Realtime publication membership, RLS and column grants in the live Supabase project.
+5. Test on supported HTTPS desktop/mobile browsers with two accounts. See the detailed setup checklist.
+
+## Local quality checks
+
+```sh
+npm ci
 npm test
-node --test tests/notification-grouping.test.js
+npm run lint
+npm run build
 ```
 
-## Backend setup still required
-Review `NOTIFICATIONS-BACKEND-CONTRACT.md` with the backend developer. The repository's existing notification migration currently supports only `like` and `comment`; replies/follows need backend-generated rows and suitable real target fields. Supabase Realtime must be enabled for `public.notifications`. Push is intentionally shown as not configured until both frontend environment variables and the authenticated backend endpoint are available.
-
-## Manual browser test
-1. Log in as the recipient and navigate to Notifications.
-2. Generate a like/comment from another test account. Confirm the badge changes without reloading.
-3. Generate multiple likes for one post and confirm they group, then expand and mark just one underlying activity as read.
-4. Mark a group as read and use Mark all as read. Confirm the unread badge updates.
-5. Confirm comments navigate to `/post/:id#comments` and follows to `/profile/:username`.
-6. With push config absent, confirm the UI clearly says not configured and never claims enablement. With a backend deployed, exercise permission, subscribe, disable, and push-click navigation on a secure origin.
-
-## Suggested commit message
-
-```text
-feat(notifications): add grouped activity and push controls
-```
+Some checks in the independent audit environment were blocked because package registry access failed; see `NOTIFICATIONS-AUDIT-REPORT.md` for exact outcomes and items not verifiable here.
