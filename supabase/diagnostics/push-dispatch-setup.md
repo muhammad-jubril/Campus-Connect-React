@@ -11,6 +11,7 @@ Apply these migrations in order using the repository's established Supabase migr
 3. `supabase/migrations/20261012151410_install_push_dispatch_extensions.sql` — enables `pg_cron` and `pg_net`.
 4. `supabase/migrations/20261012151542_notification_push_vault_runtime_access.sql` — creates the initial service-role-only Vault runtime reader and the queue target index.
 5. `supabase/migrations/20261012151640_notification_push_vault_guarded_runtime_config.sql` — replaces that reader with the guarded function that verifies the supplied dispatch secret before returning VAPID material.
+6. `supabase/migrations/20261012170749_follow_operations_and_profile_queries.sql` — adds idempotent follow/unfollow RPCs, block-aware follower/following lists and counts, and restricts direct client mutation of the existing `public.follows` table. It reuses the existing follow notification trigger.
 
 These forward-only migrations do not delete existing notification, like, or comment data.
 
