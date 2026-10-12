@@ -4,6 +4,7 @@ import { readFile } from "node:fs/promises";
 
 const root = new URL("../", import.meta.url);
 const countMigrationUrl = new URL("supabase/migrations/20261012232526_post_view_counts_for_feed.sql", root);
+const aclMigrationUrl = new URL("supabase/migrations/20261012232807_restrict_post_view_counts_rpc_execution.sql", root);
 const recordMigrationUrl = new URL("supabase/migrations/20261012040129_content_safety_ownership_and_view_guards.sql", root);
 const baseViewMigrationUrl = new URL("supabase/migrations/20261010231946_post_views.sql", root);
 
@@ -41,4 +42,10 @@ test("unique view recording remains separate and idempotent per account/post", a
   assert.match(guarded, /on conflict \(post_id, viewer_id\) do nothing/i);
   assert.match(guarded, /function public\.record_post_view\(p_post_id uuid\)/i);
   assert.doesNotMatch(await readFile(countMigrationUrl, "utf8"), /create or replace function public\.record_post_view/i);
+});
+
+test("forward migration removes service-role and public execute grants from aggregate RPC", async () => {
+  const sql = await readFile(aclMigrationUrl, "utf8");
+  assert.match(sql, /revoke all on function public\\.get_post_view_counts\\(uuid\\[\\]\\)[\\s\\S]*?from public, anon, authenticated, service_role/i);
+  assert.match(sql, /grant execute on function public\\.get_post_view_counts\\(uuid\\[\\]\\) to authenticated/i);
 });
