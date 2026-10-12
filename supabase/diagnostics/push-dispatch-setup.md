@@ -41,7 +41,7 @@ VITE_PUSH_SUBSCRIPTION_ENDPOINT=https://<project-ref>.supabase.co/functions/v1/p
 
 ## 3. Schedule the queue dispatcher
 
-The queue sets `deliver_after` to the configured `quiet_window_seconds` (default 60; allowed 1–3600) after the first event in a pending group. Change it via `UPDATE public.notification_push_config SET quiet_window_seconds = 60, updated_at = now() WHERE singleton = true;`. New activity joins the pending group without moving the initial deadline; once a batch is being processed, later activity starts the next window. Setting `enabled = false` temporarily disables push queuing only; in-app notification/activity rows continue to persist. Configure a one-minute Supabase Cron job (or an authenticated external scheduler) to `POST` to:
+The queue sets `deliver_after` to the configured `quiet_window_seconds` (default 60; allowed 1–3600) after the first event in a pending group. The setting is seeded with `enabled = false` so activity cannot pile up for delayed delivery before VAPID secrets and the scheduler are configured. Change the window with `UPDATE public.notification_push_config SET quiet_window_seconds = 60, updated_at = now() WHERE singleton = true;`. New activity joins the pending group without moving the initial deadline; once a batch is being processed, later activity starts the next window. Setting `enabled = false` temporarily disables push queuing only; in-app notification/activity rows continue to persist. Configure a one-minute Supabase Cron job (or an authenticated external scheduler) to `POST` to:
 
 `https://<project-ref>.supabase.co/functions/v1/dispatch-push-notifications`
 
@@ -55,7 +55,19 @@ The current frontend's grouping code reads `comment_id` before `thread_id`. Acco
 
 The existing UI groups follow notices by UTC calendar day. The push queue groups following activity by the followed profile (the recipient) during the 60-second quiet window. Like and top-level comment pushes group per post; replies group per root thread.
 
-## 5. Verify live behaviour
+## 5. Enable push after configuration
+
+After the Edge Function secrets are set, both functions deployed, the scheduler is running and a test push has been accepted by a provider, enable new push queue entries:
+
+```sql
+update public.notification_push_config
+set enabled = true, updated_at = now()
+where singleton = true;
+```
+
+Until this explicit step, the in-app notification rows continue to persist, but new push batches are not queued. The 60-second quiet-window value is still ready for configuration.
+
+## 6. Verify live behaviour
 
 Use two test accounts and a supported HTTPS browser/device. Verify likes and comments queue only for another account, no push before the first 60 seconds, multiple same-group activities coalesce, a new event while a batch is processing enters a later batch, read notifications and newly blocked pairs don't deliver, and a worker retry doesn't re-send devices already recorded as delivered. Disable push on one device and verify only the caller's endpoint is removed. Force a test expired endpoint in a non-production environment and confirm HTTP 404/410 cleanup.
 
