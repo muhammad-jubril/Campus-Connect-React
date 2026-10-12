@@ -78,6 +78,9 @@ test("push coalescing uses a configurable quiet window without endangering in-ap
   const base = await readFile(basePipelineUrl, "utf8");
   assert.match(base, /for update skip locked/i);
   assert.match(base, /push_delivery_receipts/i);
+  assert.match(base, /carry per-device receipts to the merged queue id/i);
+  assert.match(base, /select v_pending_id, r\.subscription_id, r\.state, r\.attempts/i);
+  assert.match(base, /where r\.queue_id=p_queue_id[\s\S]*?on conflict \(queue_id, subscription_id\) do update/i);
 });
 
 test("dispatcher checks current blocks and hidden-post preferences before sending", async () => {
