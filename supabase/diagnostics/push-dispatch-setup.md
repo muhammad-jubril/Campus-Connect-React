@@ -56,7 +56,7 @@ Verify the job in `cron.job`, its history in `cron.job_run_details`, HTTP result
 
 ## 5. Quiet window and safe activation
 
-The database config is intentionally `enabled = false` and `quiet_window_seconds = 60`. In-app notification rows continue to be created while push is disabled. The first event fixes its batch deadline; later events join the pending group without moving that deadline. The quiet window accepts 1–3600 seconds.
+The database config is intentionally `enabled = false` with a quiet window of 60 seconds (`quiet_window_seconds = 60`). In-app notification rows continue to be created while push is disabled. The first event fixes its batch deadline; later events join the pending group without moving that deadline. The quiet window accepts 1–3600 seconds.
 
 Do not enable push until a supported HTTPS browser has a persisted subscription and a real-device test confirms receipt and correct click navigation. Once tested, enable it explicitly:
 
