@@ -34,7 +34,7 @@ The dispatcher claims due rows with `FOR UPDATE SKIP LOCKED`, uses per-subscript
 
 ## Security
 
-- Push subscription registration validates the caller's Supabase access token with `auth.getUser` and uses that verified user ID; request bodies cannot choose an owner ID.
+- Push subscription registration must send both `Authorization: Bearer <Supabase access token>` and `apikey: <VITE_SUPABASE_ANON_KEY>` in direct browser `fetch` requests. The bearer token authenticates the signed-in user; the public project key identifies the project and is safe in the `apikey` header. The backend validates the access token with `auth.getUser` and derives the owner ID; request bodies cannot choose an owner ID. Never send a service-role/secret key to the browser.
 - Subscription endpoints are restricted to HTTPS and a list of known browser push-provider hosts, and key material is validated before persistence.
 - Endpoint registration serializes both endpoint ownership and user subscription quota, prevents transferring an endpoint already owned by another account, and limits each account to ten subscriptions.
 - The subscription, queue, and receipt tables have RLS enabled and no grants to `PUBLIC`, `anon`, or `authenticated`. Service-role-only RPCs are called by Edge Functions after their own authorization checks.
