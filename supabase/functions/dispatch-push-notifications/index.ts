@@ -1,6 +1,7 @@
-// Scheduled worker. Deploy with VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY,
-// VAPID_SUBJECT and PUSH_DISPATCH_SECRET set as Supabase function secrets.
-// Configure the scheduled caller described in diagnostics/push-dispatch-setup.md.
+// Scheduled worker. VAPID credentials and the dispatch secret are stored in
+// Supabase Vault. The dispatch secret is validated by the guarded
+// service-role-only RPC before any VAPID key is returned to this worker.
+// Configure the one-minute caller described in diagnostics/push-dispatch-setup.md.
 import { createClient } from "npm:@supabase/supabase-js@2.116.0";
 import webpush from "npm:web-push@3.6.7";
 
