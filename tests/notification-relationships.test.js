@@ -70,7 +70,7 @@ test("push coalescing uses a configurable quiet window without endangering in-ap
   assert.match(sql, /make_interval\(secs => v_quiet_seconds\)/i);
   assert.match(sql, /pg_advisory_xact_lock/i);
   assert.match(sql, /activity_count = q\.activity_count \+ 1/i);
-  assert.match(sql, /notification_push_queue q[\s\S]*?status = 'pending'/i);
+  assert.match(sql, /push_notification_queue q[\s\S]*?status = 'pending'/i);
   assert.match(sql, /exception when others then[\s\S]*?must never roll back the persisted in-app notification/i);
   assert.match(sql, /reply:thread:/i);
   assert.match(sql, /follow:profile:/i);
