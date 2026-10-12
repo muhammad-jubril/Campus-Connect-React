@@ -1,4 +1,4 @@
-export const MAX_CONTENT_REPORT_DETAILS = 800;
+export const MAX_CONTENT_REPORT_DETAILS = 30;
 
 const COMMON_REASONS = Object.freeze([
   { value: "harassment_bullying", label: "Harassment or bullying" },

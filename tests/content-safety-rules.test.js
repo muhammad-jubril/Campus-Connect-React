@@ -34,7 +34,7 @@ test("report draft trims optional explanation and preserves exact target identit
 test("report drafts reject unrelated reasons, invalid targets and oversized explanations", () => {
   assert.throws(() => validateContentReportDraft({ targetType: "post", reason: "impersonation" }), /reason that applies/);
   assert.throws(() => validateContentReportDraft({ targetType: "listing", reason: "other" }), /valid item/);
-  assert.throws(() => validateContentReportDraft({ targetType: "account", reason: "other", details: "x".repeat(MAX_CONTENT_REPORT_DETAILS + 1) }), /800 characters/);
+  assert.throws(() => validateContentReportDraft({ targetType: "account", reason: "other", details: "x".repeat(MAX_CONTENT_REPORT_DETAILS + 1) }), /30 characters/);
 });
 
 test("a block applies in both directions but never to self or an unknown account", () => {

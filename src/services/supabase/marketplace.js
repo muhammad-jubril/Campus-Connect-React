@@ -151,8 +151,10 @@ export async function clearListingImage(listingId, sellerId) {
 
 export async function submitListingReport({ listingId, reporterId, reason, details = "" }) {
   if (!listingId || !reporterId) throw new Error("Sign in to report a listing.");
+  const safeDetails = typeof details === "string" ? details.trim() : "";
+  if (safeDetails.length > 30) throw new Error("Report details must be 30 characters or fewer.");
   const { error } = await supabase.from("marketplace_reports").insert({
-    listing_id: listingId, reporter_id: reporterId, reason, details: details.trim() || null,
+    listing_id: listingId, reporter_id: reporterId, reason, details: safeDetails || null,
   });
   throwIfError(error);
 }
