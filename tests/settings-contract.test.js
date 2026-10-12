@@ -8,7 +8,7 @@ const pushServiceUrl = new URL("src/services/pushNotifications.js", root);
 const routesUrl = new URL("src/routes/AppRoutes.jsx", root);
 const drawerUrl = new URL("src/components/layout/Drawer.jsx", root);
 const preferenceServiceUrl = new URL("src/services/supabase/notificationPreferences.js", root);
-const preferenceMigrationUrl = new URL("supabase/migrations/20261012180000_settings_notification_preferences.sql", root);
+const preferenceMigrationUrl = new URL("supabase/migrations/20261012203746_settings_notification_preferences.sql", root);
 const dispatcherUrl = new URL("supabase/functions/dispatch-push-notifications/index.ts", root);
 const contractUrl = new URL("SETTINGS-BACKEND-CONTRACT.md", root);
 
@@ -27,7 +27,7 @@ test("push categories load and save through Supabase rather than browser-only st
     readFile(settingsUrl, "utf8"),
     readFile(preferenceServiceUrl, "utf8"),
   ]);
-  for (const field of ["push_likes", "push_comments", "push_replies", "push_follows"]) {
+  for (const field of ["push_enabled", "push_likes", "push_comments", "push_replies", "push_follows"]) {
     assert.match(page, new RegExp(field));
     assert.match(service, new RegExp(field));
   }
@@ -60,8 +60,10 @@ test("push dispatcher enforces persisted category preferences without deleting i
   assert.match(dispatcher, /comment: "push_comments"/);
   assert.match(dispatcher, /reply: "push_replies"/);
   assert.match(dispatcher, /follow: "push_follows"/);
-  assert.match(dispatcher, /preferences\[preferenceField\] === false/);
-  assert.match(contract, /underlying `public\.notifications` rows[\s\S]*?remain unchanged/i);
+  assert.match(dispatcher, /preferences\?\.\[preferenceField\] === false/);
+  assert.match(dispatcher, /preferences\?\.push_enabled === false/);
+  assert.match(dispatcher, /user_disabled_push_master/);
+  assert.match(contract, /does not delete or mutate `public\.notifications`/i);
 });
 
 test("account deletion requires explicit confirmation and server-confirmed completion", async () => {
@@ -76,9 +78,9 @@ test("account deletion requires explicit confirmation and server-confirmed compl
   assert.match(page, /data\?\.status !== "deleted"/);
   assert.match(page, /ACCOUNT_DELETION_BACKEND_READY = false/);
   assert.match(page, /disabled={!ACCOUNT_DELETION_BACKEND_READY}/);
-  assert.match(page, /The repository does not include the required server-side deletion workflow/);
+  assert.match(page, /workflow is available on the backend, but it must pass an end-to-end test with a disposable Campus Connect account/);
   assert.doesNotMatch(page, /\.from\(["'](?:profiles|posts|comments|auth\.users)["']\)\.delete\(/);
-  assert.match(contract, /does not contain a secure `delete-account` Edge Function/i);
+  assert.match(contract, /must remain unavailable in the UI until a successful end-to-end test with a disposable Campus Connect account/i);
   assert.match(contract, /status.*deleted/i);
 });
 

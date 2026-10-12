@@ -2,9 +2,19 @@
 // from Supabase Auth; the request body never supplies a user ID.
 import { createClient } from "npm:@supabase/supabase-js@2.116.0";
 
-const ALLOWED_ORIGINS = (Deno.env.get("ALLOWED_ORIGINS") ??
-  "https://campus-connect-224y.vercel.app,http://localhost:5173,http://127.0.0.1:5173")
+// Keep known app origins allowed even when an environment-specific list is set.
+const DEFAULT_ALLOWED_ORIGINS = [
+  "https://mycampusconnectt.vercel.app",
+  "https://campus-connect-224y.vercel.app",
+  "http://localhost:5173",
+  "http://127.0.0.1:5173",
+];
+const CONFIGURED_ALLOWED_ORIGINS = (Deno.env.get("ALLOWED_ORIGINS") ?? "")
   .split(",").map((origin) => origin.trim()).filter(Boolean);
+const ALLOWED_ORIGINS = [...new Set([
+  ...DEFAULT_ALLOWED_ORIGINS,
+  ...CONFIGURED_ALLOWED_ORIGINS,
+])];
 const PREVIEW_ORIGIN = /^https:\/\/campus-connect[a-z0-9-]*\.vercel\.app$/;
 const MAX_BODY_LENGTH = 12_000;
 
@@ -120,6 +130,9 @@ Deno.serve(async (request: Request): Promise<Response> => {
     });
     if (error) {
       const message = error.message ?? "";
+      if (/account unavailable|account is being deleted/i.test(message)) {
+        return json({ error: "account_unavailable" }, 403, cors);
+      }
       const status = message.includes("already belongs") ? 409 : message.includes("Too many") ? 429 : 400;
       return json({ error: status === 409 ? "endpoint_conflict" : status === 429 ? "subscription_limit" : "registration_failed" }, status, cors);
     }

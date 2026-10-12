@@ -271,18 +271,31 @@ export default function SettingsPage() {
           id="settings-notifications-title"
           eyebrow="PREFERENCES"
           title="Notifications"
-          description="Control push alerts on this device and choose which activity can trigger them. In-app notification history is kept."
+          description="Control push alerts for your account, choose which activity can trigger them, and manage each browser or device separately. In-app notification history is kept."
         />
 
         <div className="settings-master-row">
           <div className="settings-row-copy">
-            <h3>Phone push notifications</h3>
-            <p>Permission and subscription are checked separately below.</p>
+            <h3>Account-wide push notifications</h3>
+            <p>When off, Campus Connect will not send push alerts to any of your devices. In-app notifications remain available.</p>
+          </div>
+          <Switch
+            checked={Boolean(preferences?.push_enabled)}
+            disabled={Boolean(savingPreference) || preferencesLoading || !preferences}
+            label="Account-wide push notifications"
+            onChange={(nextValue) => void handleCategoryChange("push_enabled", nextValue)}
+          />
+        </div>
+
+        <div className="settings-master-row">
+          <div className="settings-row-copy">
+            <h3>Push notifications on this device</h3>
+            <p>Manage this browser's subscription independently of your account-wide preference.</p>
           </div>
           <Switch
             checked={isPushEnabled}
             disabled={pushBusy || !canTogglePush}
-            label="Phone push notifications on this device"
+            label="Push notifications on this device"
             onChange={() => void handlePushToggle()}
           />
         </div>
@@ -364,7 +377,7 @@ export default function SettingsPage() {
       <section className="settings-card settings-danger-card" aria-labelledby="settings-delete-title">
         <SectionHeading id="settings-delete-title" eyebrow="PERMANENT ACTION" title="Delete account" description="Account deletion cannot be undone. The secure deletion service must complete the request before the app signs you out. Limited records may be retained where required for legal, safety, or dispute-handling purposes." />
         <button type="button" className="btn btn-danger settings-delete-button" onClick={openDeleteDialog} disabled={!ACCOUNT_DELETION_BACKEND_READY} aria-describedby="settings-delete-backend-status">Delete account…</button>
-        {!ACCOUNT_DELETION_BACKEND_READY && <p id="settings-delete-backend-status" className="settings-error" role="status">Account deletion is unavailable in this build. The repository does not include the required server-side deletion workflow; this control remains disabled until the cleanup and retention policy is implemented and tested.</p>}
+        {!ACCOUNT_DELETION_BACKEND_READY && <p id="settings-delete-backend-status" className="settings-error" role="status">The secure deletion workflow is available on the backend, but it must pass an end-to-end test with a disposable Campus Connect account before this destructive action is enabled.</p>}
       </section>
 
       {deleteDialogOpen && (
