@@ -95,7 +95,7 @@ test("listing status transitions are one-way; sold listings can be removed", () 
 });
 
 test("database rules use scale-free numeric prices and reject fractional values before persistence", async () => {
-  const migration = await readFile(new URL("../supabase/migrations/20261012120000_marketplace_numeric_price.sql", import.meta.url), "utf8");
+  const migration = await readFile(new URL("../supabase/migrations/20261012040104_marketplace_numeric_price.sql", import.meta.url), "utf8");
   assert.match(migration, /alter column price type numeric using price::numeric/i);
   assert.match(migration, /new\.price <> trunc\(new\.price\)/i);
   assert.match(migration, /pg_advisory_xact_lock/i);
@@ -113,7 +113,7 @@ test("listing image upload revalidates optimisation at the Storage service bound
 });
 
 test("marketplace database migrations provide server-side ownership, visibility, and Storage controls", async () => {
-  const migration = await readFile(new URL("../supabase/migrations/20261012100000_marketplace_beta.sql", import.meta.url), "utf8");
+  const migration = await readFile(new URL("../supabase/migrations/20261012040055_marketplace_beta.sql", import.meta.url), "utf8");
   assert.match(migration, /pg_catalog\.pg_advisory_xact_lock/);
   assert.match(migration, /alter column status set default 'active'[\s\S]*alter column status set not null/i);
   assert.match(migration, /create policy marketplace_listings_insert_own[\s\S]*with check \(seller_id=\(select auth\.uid\(\)\)\)/i);
@@ -125,8 +125,8 @@ test("marketplace database migrations provide server-side ownership, visibility,
 });
 
 test("substring search has optional trigram indexes and image policies are reset before re-creation", async () => {
-  const indexes = await readFile(new URL("../supabase/migrations/20261012130000_marketplace_search_indexes.sql", import.meta.url), "utf8");
-  const coreMigration = await readFile(new URL("../supabase/migrations/20261012100000_marketplace_beta.sql", import.meta.url), "utf8");
+  const indexes = await readFile(new URL("../supabase/migrations/20261012040107_marketplace_search_indexes.sql", import.meta.url), "utf8");
+  const coreMigration = await readFile(new URL("../supabase/migrations/20261012040055_marketplace_beta.sql", import.meta.url), "utf8");
   assert.match(indexes, /marketplace_listings_active_title_trgm_idx/);
   assert.match(indexes, /marketplace_listings_active_location_trgm_idx/);
   assert.match(indexes, /gin_trgm_ops/);
@@ -158,7 +158,7 @@ test("listing report modal manages focus, traps Tab, restores the opener, and su
 
 
 test("forward migration hardens already-deployed trigger functions without changing their bodies", async () => {
-  const migration = await readFile(new URL("../supabase/migrations/20261012140000_marketplace_trigger_privileges.sql", import.meta.url), "utf8");
+  const migration = await readFile(new URL("../supabase/migrations/20261012040114_marketplace_trigger_privileges.sql", import.meta.url), "utf8");
   assert.match(migration, /alter function public\.enforce_marketplace_listing_rules\(\) security definer/i);
   assert.match(migration, /alter function public\.validate_marketplace_report\(\) security definer/i);
   assert.match(migration, /set search_path = ''/i);

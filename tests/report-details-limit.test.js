@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { MAX_CONTENT_REPORT_DETAILS, validateContentReportDraft } from "../src/utils/contentSafetyRules.js";
 
-const migrationPath = new URL("../supabase/migrations/20261012160000_report_details_limit_30.sql", import.meta.url);
+const migrationPath = new URL("../supabase/migrations/20261012040126_report_details_limit_30.sql", import.meta.url);
 const patchScriptPath = new URL("../scripts/apply-report-details-limit.mjs", import.meta.url);
 const reportDialogPath = new URL("../src/components/safety/ReportDialog.jsx", import.meta.url);
 

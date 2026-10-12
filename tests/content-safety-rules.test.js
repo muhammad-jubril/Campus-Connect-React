@@ -8,7 +8,7 @@ import {
   validateContentReportDraft,
 } from "../src/utils/contentSafetyRules.js";
 
-const migrationUrl = new URL("../supabase/migrations/20261012150000_content_reporting_hiding_blocking.sql", import.meta.url);
+const migrationUrl = new URL("../supabase/migrations/20261012040123_content_reporting_hiding_blocking.sql", import.meta.url);
 const menuUrl = new URL("../src/components/safety/ContentSafetyMenu.jsx", import.meta.url);
 const patcherUrl = new URL("../scripts/apply-content-safety-patch.mjs", import.meta.url);
 const moderationPageUrl = new URL("../src/pages/ModerationReportsPage.jsx", import.meta.url);
@@ -126,7 +126,7 @@ test("moderation evidence includes reported image URLs without exposing them in 
   assert.match(page, /report\.target_image_url/);
 });
 
-const ownershipMigrationUrl = new URL("../supabase/migrations/20261012170000_content_safety_ownership_and_view_guards.sql", import.meta.url);
+const ownershipMigrationUrl = new URL("../supabase/migrations/20261012040129_content_safety_ownership_and_view_guards.sql", import.meta.url);
 const commentsModalUrl = new URL("../src/components/feed/CommentsModal.jsx", import.meta.url);
 const postDetailUrl = new URL("../src/pages/PostDetailPage.jsx", import.meta.url);
 

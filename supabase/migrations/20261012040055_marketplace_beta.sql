@@ -1,6 +1,6 @@
 -- Campus Connect Marketplace beta.
 -- Before applying, run supabase/diagnostics/marketplace-preflight.sql against the live project.
--- Existing listing rows and stored objects are preserved; incompatible legacy schemas/statuses stop the migration.
+-- Existing listing rows and stored objects are preserved; incompatible legacy data stops the migration.
 begin;
 
 do $$
@@ -29,7 +29,6 @@ begin
       or not exists (select 1 from information_schema.columns where table_schema='public' and table_name='marketplace_listings' and column_name='description')
       or not exists (select 1 from information_schema.columns where table_schema='public' and table_name='marketplace_listings' and column_name='price')
       or not exists (select 1 from information_schema.columns where table_schema='public' and table_name='marketplace_listings' and column_name='category')
-      or not exists (select 1 from information_schema.columns where table_schema='public' and table_name='marketplace_listings' and column_name='condition')
       or not exists (select 1 from information_schema.columns where table_schema='public' and table_name='marketplace_listings' and column_name='images')
       or not exists (select 1 from information_schema.columns where table_schema='public' and table_name='marketplace_listings' and column_name='created_at') then
       raise exception 'Marketplace migration stopped: marketplace_listings does not match the expected core schema. Run the marketplace preflight query and reconcile the schema without discarding existing rows.';
@@ -53,11 +52,19 @@ end
 $$;
 
 alter table public.marketplace_listings
+  -- Existing deployments can have the earlier schema without these beta fields.
+  -- Leave fields nullable for legacy rows; inserts/changes are validated below.
+  add column if not exists condition text,
   add column if not exists image_path text,
   add column if not exists status text not null default 'active',
   add column if not exists pickup_location text,
   add column if not exists negotiable boolean not null default false,
   add column if not exists updated_at timestamptz not null default now();
+
+-- The legacy table declared images NOT NULL, while the current UI clears a
+-- removed listing's image by writing NULL. This preserves existing arrays and
+-- matches the current frontend contract.
+alter table public.marketplace_listings alter column images drop not null;
 
 -- A scale-free numeric column preserves fractional API input so the trigger can
 -- reject it. NUMERIC(12,0) silently rounds input before a BEFORE trigger sees it.
@@ -107,25 +114,90 @@ begin
 end
 $$;
 
+-- Replace legacy status checks (the live schema allows only active/sold) so
+-- the frontend's supported soft-removal state is enforced by the database too.
+do $$
+declare
+  status_attnum smallint;
+  c record;
+begin
+  select attnum into status_attnum
+  from pg_attribute
+  where attrelid='public.marketplace_listings'::regclass
+    and attname='status' and not attisdropped;
+
+  for c in
+    select conname from pg_constraint
+    where conrelid='public.marketplace_listings'::regclass
+      and contype='c' and status_attnum = any(conkey)
+  loop
+    execute format('alter table public.marketplace_listings drop constraint %I', c.conname);
+  end loop;
+end
+$$;
+alter table public.marketplace_listings
+  add constraint marketplace_listings_status_check
+  check (status in ('active','sold','removed')) not valid;
+alter table public.marketplace_listings validate constraint marketplace_listings_status_check;
+
 -- Ensure existing-but-nullable status columns also receive the beta default.
--- The preceding block rejects null/unknown legacy values before this tightening.
+-- The preceding preflight rejects null/unknown legacy values before tightening.
 alter table public.marketplace_listings
   alter column status set default 'active',
   alter column status set not null;
 
--- Make sure every seller ID maps to an existing profile without rewriting legacy rows.
+-- Tie listings to Campus Connect profiles rather than auth.users directly.
+-- The earlier auth.users ON DELETE CASCADE would silently delete listings;
+-- profile-level RESTRICT gives the intended account-deletion behavior. Stop if
+-- legacy rows are orphaned instead of dropping/rewriting them.
 do $$
+declare
+  seller_attnum smallint;
+  orphan_seller uuid;
+  c record;
 begin
+  select attnum into seller_attnum
+  from pg_attribute
+  where attrelid='public.marketplace_listings'::regclass
+    and attname='seller_id' and not attisdropped;
+
+  select l.seller_id into orphan_seller
+  from public.marketplace_listings l
+  left join public.profiles p on p.id=l.seller_id
+  where p.id is null
+  limit 1;
+  if found then
+    raise exception 'Marketplace migration stopped: seller % has no Campus Connect profile. Reconcile that listing explicitly before retrying.', orphan_seller;
+  end if;
+
+  for c in
+    select conname from pg_constraint
+    where conrelid='public.marketplace_listings'::regclass
+      and contype='f' and confrelid='auth.users'::regclass
+      and seller_attnum = any(conkey)
+  loop
+    execute format('alter table public.marketplace_listings drop constraint %I', c.conname);
+  end loop;
+
   if not exists (
-    select 1 from pg_constraint c
-    where c.conrelid='public.marketplace_listings'::regclass and c.contype='f'
-      and c.confrelid='public.profiles'::regclass
-      and exists (select 1 from pg_attribute a where a.attrelid=c.conrelid and a.attnum=any(c.conkey) and a.attname='seller_id')
+    select 1 from pg_constraint con
+    where con.conrelid='public.marketplace_listings'::regclass and con.contype='f'
+      and con.confrelid='public.profiles'::regclass
+      and seller_attnum = any(con.conkey)
   ) then
     alter table public.marketplace_listings
       add constraint marketplace_listings_seller_profile_fkey
       foreign key (seller_id) references public.profiles(id) on delete restrict not valid;
   end if;
+
+  for c in
+    select conname from pg_constraint
+    where conrelid='public.marketplace_listings'::regclass
+      and contype='f' and confrelid='public.profiles'::regclass
+      and seller_attnum = any(conkey) and not convalidated
+  loop
+    execute format('alter table public.marketplace_listings validate constraint %I', c.conname);
+  end loop;
 end
 $$;
 
