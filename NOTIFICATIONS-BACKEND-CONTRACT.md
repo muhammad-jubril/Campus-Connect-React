@@ -81,5 +81,5 @@ const { data: followers, error } = await supabase.rpc("get_followers", {
 
 `get_following` takes the same arguments as `get_followers`. List RPCs return an array of profile rows. For authorization failures, show a neutral “profile unavailable” state rather than inferring whether a blocked profile exists.
 
-Migration: `supabase/migrations/20261012164500_follow_operations_and_profile_queries.sql`.
+Migration: `supabase/migrations/20261012170749_follow_operations_and_profile_queries.sql`.
 Rollback-safe diagnostic: `supabase/diagnostics/follows-smoke-test.sql`.
