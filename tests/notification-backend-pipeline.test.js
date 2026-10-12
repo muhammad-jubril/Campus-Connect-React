@@ -56,6 +56,10 @@ test("subscription endpoint verifies the session, derives user ID server-side an
   assert.match(source, /endpoint\.protocol !== "https:"/);
   assert.match(source, /host === "fcm\.googleapis\.com"/);
   assert.match(source, /keys\?\.p256dh/);
+  assert.ok(source.includes('"https://mycampusconnectt.vercel.app"'));
+  assert.ok(source.includes("DEFAULT_ALLOWED_ORIGINS"));
+  assert.ok(source.includes("CONFIGURED_ALLOWED_ORIGINS"));
+  assert.ok(source.includes("new Set(["));
   const client = await readFile(pushClientUrl, "utf8");
   assert.match(client, /isTrustedPushEndpoint/);
   assert.match(client, /endpoint\.origin === supabase\.origin/);
