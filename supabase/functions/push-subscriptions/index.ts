@@ -2,25 +2,16 @@
 // from Supabase Auth; the request body never supplies a user ID.
 import { createClient } from "npm:@supabase/supabase-js@2.116.0";
 
-// Keep known app origins in the allow-list even when ALLOWED_ORIGINS
-// is set to a narrower deployment-specific list. Supabase logs observed the
-// active production domain mycampusconnectt.vercel.app.
-const DEFAULT_ALLOWED_ORIGINS = [
-  "https://campus-connect-224y.vercel.app",
-  "https://mycampusconnectt.vercel.app",
-  "http://localhost:5173",
-  "http://127.0.0.1:5173",
-];
-const ENV_ALLOWED_ORIGINS = (Deno.env.get("ALLOWED_ORIGINS") ?? "")
+const ALLOWED_ORIGINS = (Deno.env.get("ALLOWED_ORIGINS") ??
+  "https://campus-connect-224y.vercel.app,http://localhost:5173,http://127.0.0.1:5173")
   .split(",").map((origin) => origin.trim()).filter(Boolean);
-const ALLOWED_ORIGINS = [...new Set([...DEFAULT_ALLOWED_ORIGINS, ...ENV_ALLOWED_ORIGINS])];
 const PREVIEW_ORIGIN = /^https:\/\/campus-connect[a-z0-9-]*\.vercel\.app$/;
 const MAX_BODY_LENGTH = 12_000;
 
 function corsHeaders(origin: string | null): Record<string, string> {
   const headers: Record<string, string> = {
     Vary: "Origin",
-    "Access-Control-Allow-Methods": "POST, PUT, DELETE, OPTIONS",
+    "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
     "Access-Control-Allow-Headers": "authorization, apikey, content-type, x-client-info",
     "Access-Control-Max-Age": "86400",
   };
@@ -56,7 +47,7 @@ function validKey(value: unknown, minimum: number, maximum: number): value is st
 Deno.serve(async (request: Request): Promise<Response> => {
   const cors = corsHeaders(request.headers.get("origin"));
   if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: cors });
-  if (!["POST", "PUT", "DELETE"].includes(request.method)) {
+  if (!["GET", "POST", "PUT", "DELETE"].includes(request.method)) {
     return json({ error: "method_not_allowed" }, 405, cors);
   }
 
@@ -75,18 +66,32 @@ Deno.serve(async (request: Request): Promise<Response> => {
   const { data: authData, error: authError } = await authClient.auth.getUser(tokenMatch[1]);
   if (authError || !authData.user) return json({ error: "invalid_session" }, 401, cors);
 
-  let body: Record<string, unknown>;
-  try {
-    const raw = await request.text();
-    if (raw.length > MAX_BODY_LENGTH) return json({ error: "invalid_request" }, 413, cors);
-    body = JSON.parse(raw);
-    if (!body || typeof body !== "object" || Array.isArray(body)) throw new Error("invalid body");
-  } catch { return json({ error: "invalid_request" }, 400, cors); }
-
   const admin = createClient(supabaseUrl, serviceRoleKey, {
     auth: { persistSession: false, autoRefreshToken: false },
   });
   try {
+    if (request.method === "GET") {
+      // Read-only status lookup. Do not silently re-register a browser subscription
+      // merely because the user opened Settings or asked to refresh its status.
+      const endpoint = new URL(request.url).searchParams.get("endpoint");
+      if (!validEndpoint(endpoint)) return json({ error: "invalid_endpoint" }, 400, cors);
+      const { data, error } = await admin.from("push_subscriptions")
+        .select("id")
+        .eq("user_id", authData.user.id)
+        .eq("endpoint", endpoint)
+        .maybeSingle();
+      if (error) throw error;
+      return json({ registered: Boolean(data) }, 200, cors);
+    }
+
+    let body: Record<string, unknown>;
+    try {
+      const raw = await request.text();
+      if (raw.length > MAX_BODY_LENGTH) return json({ error: "invalid_request" }, 413, cors);
+      body = JSON.parse(raw);
+      if (!body || typeof body !== "object" || Array.isArray(body)) throw new Error("invalid body");
+    } catch { return json({ error: "invalid_request" }, 400, cors); }
+
     if (request.method === "DELETE") {
       const endpoint = body.endpoint;
       if (!validEndpoint(endpoint)) return json({ error: "invalid_endpoint" }, 400, cors);
