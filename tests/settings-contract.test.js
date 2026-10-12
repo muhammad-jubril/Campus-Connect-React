@@ -78,7 +78,7 @@ test("account deletion requires explicit confirmation and server-confirmed compl
   assert.match(page, /data\?\.status !== "deleted"/);
   assert.match(page, /ACCOUNT_DELETION_BACKEND_READY = false/);
   assert.match(page, /disabled={!ACCOUNT_DELETION_BACKEND_READY}/);
-  assert.match(page, /the workflow must pass an end-to-end test with a disposable Campus Connect account/);
+  assert.match(page, /workflow is available on the backend, but it must pass an end-to-end test with a disposable Campus Connect account/);
   assert.doesNotMatch(page, /\.from\(["'](?:profiles|posts|comments|auth\.users)["']\)\.delete\(/);
   assert.match(contract, /must remain unavailable in the UI until a successful end-to-end test with a disposable Campus Connect account/i);
   assert.match(contract, /status.*deleted/i);
