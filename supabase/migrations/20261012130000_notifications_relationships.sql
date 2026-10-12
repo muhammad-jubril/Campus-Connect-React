@@ -224,7 +224,6 @@ BEGIN
   END LOOP;
 END
 $$;
-$;
 
 CREATE POLICY notifications_select_own
 ON public.notifications FOR SELECT TO authenticated
