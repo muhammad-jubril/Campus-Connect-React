@@ -133,6 +133,28 @@ Deno.serve(async (request: Request): Promise<Response> => {
         continue;
       }
 
+      // Re-check recipient-specific content hiding at send time. Reporting alone
+      // does not hide content; only an explicit hidden_posts preference suppresses
+      // that target's push, while the underlying notification remains persisted.
+      if (notification.post_id) {
+        const { data: hiddenTarget, error: hiddenError } = await admin
+          .from("hidden_posts")
+          .select("post_id")
+          .eq("user_id", notification.recipient_id)
+          .eq("post_id", notification.post_id)
+          .maybeSingle();
+        if (hiddenError) throw hiddenError;
+        if (hiddenTarget) {
+          await admin.rpc("finish_push_notification_batch", {
+            p_queue_id: batch.queue_id,
+            p_outcome: "sent",
+            p_error_code: "target_hidden_by_recipient",
+          });
+          sent++;
+          continue;
+        }
+      }
+
       const { data: subscriptions, error: subscriptionsError } = await admin.from("push_subscriptions")
         .select("id,endpoint,p256dh,auth_secret").eq("user_id", batch.recipient_id);
       if (subscriptionsError) throw subscriptionsError;
