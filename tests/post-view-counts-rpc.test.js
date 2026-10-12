@@ -27,6 +27,7 @@ test("aggregate post-view RPC bounds batches, preserves post visibility and retu
   assert.match(sql, /p\.author_id = v_uid[\s\S]*?not public\.is_user_blocked\(p\.author_id\)[\s\S]*?from public\.hidden_posts h[\s\S]*?h\.user_id = v_uid and h\.post_id = p\.id/i);
   assert.match(sql, /revoke all on function public\.get_post_view_counts\(uuid\[\]\) from public, anon, authenticated/i);
   assert.match(sql, /grant execute on function public\.get_post_view_counts\(uuid\[\]\) to authenticated/i);
+  assert.match(sql, /revoke all on function public\.get_post_view_counts\(uuid\[\]\) from public, anon, authenticated, service_role/i);
   assert.doesNotMatch(sql, /grant\s+select[^;]*post_views/i);
   assert.doesNotMatch(sql, /insert into public\.post_views/i);
 });
