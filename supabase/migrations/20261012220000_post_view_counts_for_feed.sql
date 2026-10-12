@@ -16,6 +16,12 @@ BEGIN
     RAISE EXCEPTION 'Authentication required' USING ERRCODE = '28000';
   END IF;
 
+  -- SECURITY DEFINER bypasses table RLS, so preserve the restrictive active-account
+  -- policy before returning any counts.
+  IF NOT public.is_active_campus_account() THEN
+    RAISE EXCEPTION 'Account unavailable' USING ERRCODE = '42501';
+  END IF;
+
   IF COALESCE(pg_catalog.cardinality(p_post_ids), 0) > 100 THEN
     RAISE EXCEPTION 'At most 100 posts can be queried at once' USING ERRCODE = '22023';
   END IF;
@@ -25,11 +31,18 @@ BEGIN
   FROM public.posts p
   LEFT JOIN public.post_views pv ON pv.post_id = p.id
   WHERE p.id = ANY(COALESCE(p_post_ids, ARRAY[]::uuid[]))
-    AND NOT public.is_user_blocked(p.author_id)
-    AND NOT EXISTS (
-      SELECT 1
-      FROM public.hidden_posts h
-      WHERE h.user_id = v_uid AND h.post_id = p.id
+    -- Match posts_select_visible: a caller always sees their own post, while
+    -- other authors are subject to bilateral-block and caller-hidden filters.
+    AND (
+      p.author_id = v_uid
+      OR (
+        NOT public.is_user_blocked(p.author_id)
+        AND NOT EXISTS (
+          SELECT 1
+          FROM public.hidden_posts h
+          WHERE h.user_id = v_uid AND h.post_id = p.id
+        )
+      )
     )
   GROUP BY p.id;
 END;
