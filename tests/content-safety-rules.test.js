@@ -164,3 +164,21 @@ test("SECURITY DEFINER post-view RPC rejects hidden and mutually blocked posts",
   assert.match(migration, /Post not available/);
   assert.ok(migration.indexOf("Post not available") < migration.indexOf("insert into public.post_views"));
 });
+
+
+const hiddenPostsRecursionFixUrl = new URL("../supabase/migrations/20261012040923_hidden_posts_policy_recursion_fix.sql", import.meta.url);
+
+test("hidden-post insertion avoids recursive RLS evaluation", async () => {
+  const sql = await readFile(hiddenPostsRecursionFixUrl, "utf8");
+
+  assert.match(sql, /create or replace function public\.validate_hidden_post_target\(\)[\s\S]*?security definer[\s\S]*?set search_path = ''/i);
+  assert.match(sql, /revoke all on function public\.validate_hidden_post_target\(\) from public, anon, authenticated/i);
+
+  const insertPolicy = sql.match(/create policy hidden_posts_insert_own[\s\S]*?;/i)?.[0];
+  assert.ok(insertPolicy, "the hidden-post insert policy should exist");
+  assert.match(insertPolicy, /with check \(user_id = \(select auth\.uid\(\)\)\)/i);
+  assert.doesNotMatch(insertPolicy, /public\.posts|is_user_blocked/i);
+
+  assert.match(sql, /create trigger hidden_posts_validate_target[\s\S]*?execute function public\.validate_hidden_post_target\(\)/i);
+  assert.match(sql, /select p\.author_id[\s\S]*?from public\.posts p[\s\S]*?public\.is_user_blocked\(v_author_id\)/i);
+});
