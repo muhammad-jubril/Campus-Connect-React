@@ -113,9 +113,7 @@ export default function CommentsModal() {
   }
 
   function canDeleteComment(comment) {
-    return !!currentUser && (
-      comment.authorId === currentUser.id || post.authorId === currentUser.id
-    );
+    return Boolean(currentUser?.id && comment?.authorId === currentUser.id);
   }
 
   function requestDelete(comment, triggerElement) {

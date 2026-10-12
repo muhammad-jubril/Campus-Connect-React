@@ -51,6 +51,10 @@ export async function addComment({ postId, authorId, text }) {
 }
 
 export async function deleteComment(commentId) {
-  const { error } = await supabase.from("comments").delete().eq("id", commentId);
+  if (!commentId) throw new Error("The comment could not be identified.");
+  const { data, error } = await supabase.rpc("delete_my_comment", {
+    p_comment_id: commentId,
+  });
   if (error) throw error;
+  if (data !== true) throw new Error("Couldn't delete that comment. It may no longer be available.");
 }

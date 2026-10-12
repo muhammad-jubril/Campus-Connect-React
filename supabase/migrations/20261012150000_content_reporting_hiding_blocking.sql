@@ -484,11 +484,38 @@ create policy comments_insert_unblocked on public.comments
         )
     )
   );
-create policy comments_delete_own_or_post_author on public.comments
-  for delete to authenticated using (
-    author_id=(select auth.uid())
-    or exists (select 1 from public.posts p where p.id=comments.post_id and p.author_id=(select auth.uid()))
-  );
+create policy comments_delete_own on public.comments
+  for delete to authenticated using (author_id=(select auth.uid()));
+
+-- Return an unambiguous result for comment deletion without trusting the UI
+-- or leaking whether a different user's row exists. A caller can only delete
+-- a comment whose author_id matches the authenticated identity.
+create or replace function public.delete_my_comment(p_comment_id uuid)
+returns boolean
+language plpgsql
+volatile
+security definer
+set search_path = ''
+as $$
+declare
+  v_uid uuid := (select auth.uid());
+  v_deleted integer;
+begin
+  if v_uid is null then
+    raise exception 'Not authenticated' using errcode = '28000';
+  end if;
+  if p_comment_id is null then
+    raise exception 'The comment could not be identified.' using errcode = '22023';
+  end if;
+
+  delete from public.comments c
+  where c.id = p_comment_id and c.author_id = v_uid;
+  get diagnostics v_deleted = row_count;
+  return v_deleted = 1;
+end;
+$$;
+revoke all on function public.delete_my_comment(uuid) from public, anon, authenticated;
+grant execute on function public.delete_my_comment(uuid) to authenticated;
 
 create policy likes_select_visible on public.likes
   for select to authenticated using (

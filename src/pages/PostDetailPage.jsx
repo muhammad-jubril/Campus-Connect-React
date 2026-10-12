@@ -218,9 +218,7 @@ export default function PostDetailPage() {
   }
 
   function canDeleteComment(comment) {
-    return !!currentUser && !!visiblePost && (
-      comment.authorId === currentUser.id || visiblePost.authorId === currentUser.id
-    );
+    return Boolean(currentUser?.id && comment?.authorId === currentUser.id);
   }
 
   function handleDeleteComment(comment, triggerElement) {

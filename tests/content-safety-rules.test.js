@@ -125,3 +125,42 @@ test("moderation evidence includes reported image URLs without exposing them in 
   assert.match(page, /report\.target_media_urls/);
   assert.match(page, /report\.target_image_url/);
 });
+
+const ownershipMigrationUrl = new URL("../supabase/migrations/20261012170000_content_safety_ownership_and_view_guards.sql", import.meta.url);
+const commentsModalUrl = new URL("../src/components/feed/CommentsModal.jsx", import.meta.url);
+const postDetailUrl = new URL("../src/pages/PostDetailPage.jsx", import.meta.url);
+
+test("comment and reply deletion is limited to the row author in both UI surfaces and RLS", async () => {
+  const [migration, forwardMigration, commentsModal, postDetail] = await Promise.all([
+    readFile(migrationUrl, "utf8"),
+    readFile(ownershipMigrationUrl, "utf8"),
+    readFile(commentsModalUrl, "utf8"),
+    readFile(postDetailUrl, "utf8"),
+  ]);
+
+  assert.match(migration, /create policy comments_delete_own on public\.comments\s+for delete to authenticated using \(author_id=\(select auth\.uid\(\)\)\)/i);
+  assert.doesNotMatch(migration, /comments_delete_own_or_post_author/i);
+  assert.match(forwardMigration, /tablename='comments'\s+and cmd='DELETE'/i);
+  assert.match(forwardMigration, /create policy comments_delete_own on public\.comments\s+for delete to authenticated\s+using \(author_id=\(select auth\.uid\(\)\)\)/i);
+
+  assert.match(commentsModal, /function canDeleteComment\(comment\)\s*\{\s*return Boolean\(currentUser\?\.id && comment\?\.authorId === currentUser\.id\);\s*\}/);
+  assert.match(postDetail, /function canDeleteComment\(comment\)\s*\{\s*return Boolean\(currentUser\?\.id && comment\?\.authorId === currentUser\.id\);\s*\}/);
+  assert.doesNotMatch(commentsModal, /post\.authorId === currentUser\.id/);
+  assert.doesNotMatch(postDetail, /visiblePost\.authorId === currentUser\.id/);
+
+  const commentsService = await readFile(new URL("../src/services/supabase/comments.js", import.meta.url), "utf8");
+  assert.match(forwardMigration, /create or replace function public\.delete_my_comment\(p_comment_id uuid\)[\s\S]*?c\.author_id = v_uid[\s\S]*?return v_deleted = 1/i);
+  assert.match(forwardMigration, /revoke all on function public\.delete_my_comment\(uuid\) from public, anon, authenticated/i);
+  assert.match(forwardMigration, /grant execute on function public\.delete_my_comment\(uuid\) to authenticated/i);
+  assert.match(commentsService, /supabase\.rpc\("delete_my_comment"/);
+  assert.match(commentsService, /if \(data !== true\) throw new Error/);
+});
+
+test("SECURITY DEFINER post-view RPC rejects hidden and mutually blocked posts", async () => {
+  const migration = await readFile(ownershipMigrationUrl, "utf8");
+  assert.match(migration, /create or replace function public\.record_post_view\(p_post_id uuid\)[\s\S]*?security definer/i);
+  assert.match(migration, /public\.is_user_blocked\(v_author_id\)/i);
+  assert.match(migration, /from public\.hidden_posts h\s+where h\.user_id = v_uid and h\.post_id = p_post_id/i);
+  assert.match(migration, /Post not available/);
+  assert.ok(migration.indexOf("Post not available") < migration.indexOf("insert into public.post_views"));
+});
