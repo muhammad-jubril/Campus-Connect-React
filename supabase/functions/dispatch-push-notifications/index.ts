@@ -161,7 +161,8 @@ Deno.serve(async (request: Request): Promise<Response> => {
         }
       }
 
-      // Enforce the account master and the notification category at delivery time.
+      // The dispatcher enforces the account master switch and category preference
+      // immediately before sending, using the values currently saved in the account row.
       // Suppressing push never changes or deletes the in-app notification/activity.
       const preferenceColumn: Record<string, string> = {
         like: "push_likes",
