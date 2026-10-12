@@ -3,8 +3,8 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 
 const root = new URL("../", import.meta.url);
-const migrationUrl = new URL("supabase/migrations/20261012130000_notifications_relationships.sql", root);
-const basePipelineUrl = new URL("supabase/migrations/20261012120000_notifications_push_pipeline.sql", root);
+const migrationUrl = new URL("supabase/migrations/20261012140543_notifications_relationships.sql", root);
+const basePipelineUrl = new URL("supabase/migrations/20261012140537_notifications_push_pipeline.sql", root);
 const dispatcherUrl = new URL("supabase/functions/dispatch-push-notifications/index.ts", root);
 const contractUrl = new URL("NOTIFICATIONS-BACKEND-CONTRACT.md", root);
 const setupUrl = new URL("supabase/diagnostics/push-dispatch-setup.md", root);
