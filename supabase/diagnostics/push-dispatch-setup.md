@@ -56,7 +56,7 @@ Verify the job in `cron.job`, its history in `cron.job_run_details`, HTTP result
 
 ## 5. Quiet window and safe activation
 
-The live Campus Connect project currently has `enabled = true` after the controlled HTTPS browser/device delivery test succeeded; `quiet_window_seconds = 60` is unchanged. For a new environment, keep push disabled until the secrets, Edge Functions, scheduler, persisted subscription and real-device delivery test are complete. In-app notification rows are independent of push. The first event fixes its batch deadline; later events join the pending group without moving that deadline. The quiet window accepts 1–3600 seconds.
+The live Campus Connect project currently has `enabled = true` after the controlled HTTPS browser/device delivery test succeeded; `quiet_window_seconds = 60` is unchanged. For a new environment, keep push disabled until the secrets, Edge Functions, scheduler, persisted subscription and real-device delivery test are complete. In-app notification rows are independent of push. The first event fixes its batch deadline; later events join the pending group without moving that deadline. The quiet window is currently 60 seconds and accepts 1–3600 seconds.
 
 Do not enable push until a supported HTTPS browser has a persisted subscription and a real-device test confirms receipt and correct click navigation. Once tested, enable it explicitly:
 
