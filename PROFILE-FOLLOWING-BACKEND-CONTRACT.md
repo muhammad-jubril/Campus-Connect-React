@@ -2,18 +2,19 @@
 
 ## Source review status
 
-The checked-in Campus Connect React source has no follow/unfollow action and no checked-in `public.follows` table or follow-specific RPC. The notification pipeline migration only adds an optional follow-notification trigger if a real `public.follows(follower_id, following_id)` relation already exists. The frontend therefore does **not** assume the live database is ready: missing-schema errors are shown as an actionable unavailable state, counts show an em dash (not a misleading zero), and follow actions stay disabled until real summary data loads.
+The frontend reads and writes follow relationships through `public.follows`; migration `supabase/migrations/20261012170000_profile_following_backend.sql` now provides the matching table contract, ownership grants, block-aware RLS, indexes, and server-generated follow notifications. The UI deliberately shows an em dash (not a misleading zero) when the relationship data cannot be loaded, and disables follow actions until the signed-in viewer's relationship state is known.
 
-This patch expects the backend to implement the table contract below. No database migration or security policy is bundled here, because follow relationship storage and security belong to the backend developer.
+The migration is forward-only and idempotent for the expected `public.follows` contract. It attaches the follow notification trigger explicitly because the older notification pipeline only attached that trigger when a follows table already existed at the time that earlier migration ran.
 
 ## Relationship table expected by the frontend
 
 ```sql
 public.follows (
-  follower_id uuid not null references public.profiles(id) on delete cascade,
+  id uuid primary key default gen_random_uuid(),
+  follower_id uuid not null default auth.uid() references public.profiles(id) on delete cascade,
   following_id uuid not null references public.profiles(id) on delete cascade,
   created_at timestamptz not null default now(),
-  primary key (follower_id, following_id),
+  unique (follower_id, following_id),
   check (follower_id <> following_id)
 )
 ```
@@ -21,17 +22,19 @@ public.follows (
 Useful read indexes:
 
 ```sql
-create index follows_by_following_created_idx
-  on public.follows (following_id, created_at desc, follower_id);
-create index follows_by_follower_created_idx
-  on public.follows (follower_id, created_at desc, following_id);
+create index follows_following_created_idx
+  on public.follows (following_id, created_at desc, id desc, follower_id);
+create index follows_follower_created_idx
+  on public.follows (follower_id, created_at desc, id desc, following_id);
 ```
 
-The composite primary key makes a follow unique and makes repeated insert requests safe at the database boundary. `created_at` supports stable newest-first list pages. This shape matches the optional trigger hook already present in the repository's notification pipeline migration.
+The unique follower/following pair makes a follow unique and makes repeated insert requests safe at the database boundary. The `id` value is used by the current follow-status query and as the notification source identity. `created_at` supports stable newest-first list pages.
 
 ## Required RLS and grants
 
-Enable RLS on `public.follows`. At minimum, ensure:
+The checked-in migration enables RLS on `public.follows`, grants authenticated users SELECT plus INSERT on only `following_id` and DELETE, and removes older policies before installing the scoped policies. The SELECT policy permits complete follower/following lists for unblocked student pairs, while hiding edges where either endpoint is blocked by the viewer. INSERT derives `follower_id` from `auth.uid()`, rejects self-follows and blocked targets, and a unique constraint/index prevents duplicate edges. DELETE permits only the signed-in follower to remove their own outgoing edge.
+
+For production, confirm these policies and grants after applying the migration. The relationship table should:
 
 - `SELECT` only exposes relationship rows whose two student profiles are visible to the caller. Reuse the existing `public.is_user_blocked(uuid)` restriction for both endpoints so an account blocked in either direction does not appear in another student's list or count.
 - `INSERT` requires `follower_id = (select auth.uid())`, forbids self-follows, requires an existing target profile, and rejects a mutual-block pair using `public.is_user_blocked(following_id) = false`.
@@ -49,21 +52,21 @@ The frontend uses `src/services/supabase/profileFollows.js`:
 |---|---|
 | Profile counts | Count rows with `following_id = profile_id` for Followers and `follower_id = profile_id` for Following. These use exact count queries rather than fetching every row. |
 | Current viewer state | Find a row with `follower_id = auth user id` and `following_id = profile id`. |
-| Follow | Insert `{ follower_id, following_id }`; duplicate-pair error `23505` is treated as an idempotent success after the backend unique key arbitrates the race. |
+| Follow | Insert `{ following_id }`; PostgreSQL derives `follower_id` from `auth.uid()`. Duplicate-pair error `23505` is treated as an idempotent success after the backend unique key arbitrates the race. |
 | Unfollow | Delete only where both `follower_id` and `following_id` match the viewer and target. |
-| List pages | Select `follower_id, following_id, created_at`, newest first, in pages of 30; load visible public metadata using the returned IDs from `profiles`. The UI follows the relationship row order and omits profiles filtered out by profile RLS. |
+| List pages | Select relationship rows newest first, tie-breaking by `id` descending, in pages of 30; load visible public metadata using the returned IDs from `profiles`. The stable tie-break avoids skipped/repeated rows when multiple follows have the same transaction timestamp. |
 
 Profile cards expect existing `profiles` columns `id`, `username`, `name`, `avatar_url`, `faculty`, `department`, `level`, and `bio`. The existing `personFromProfileRow` mapping handles the profile page's regular profile shape.
 
 ## Blocking and notification expectations
 
 - A viewer-to-profile block pair makes counts/list contents unavailable and prevents Follow/Unfollow in the frontend. Enforce that restriction in RLS as well; the client-side RPC check is not sufficient security by itself.
-- If the app sends follow notifications, the backend should create them only after a successful new relationship insert and avoid self-notifications. Existing notification pipeline support attaches only if this exact relation and columns are present.
+- The migration generates follow notifications after successful relationship inserts, suppresses bilateral-block/self events, keys each notification to the follow row through `source_id`, and attaches the trigger even when the prior notification migration ran before the follows table existed.
 - Follow counts must derive from stored relationships; do not return a mock value when the table is missing.
 
-## Verification checklist for backend handoff
+## Verification checklist for deployment
 
-1. Apply the follow table, indexes, grants, and RLS policies in the target Supabase project.
+1. Apply `supabase/migrations/20261012170000_profile_following_backend.sql` after the base schema, content-safety and notifications migrations in the target Supabase project.
 2. Sign in with two test accounts and verify following creates exactly one row, unfollowing deletes only the caller's row, and repeated requests cannot create duplicates.
 3. Verify counts change after each operation and in a second browser/session.
 4. Verify follower/following pagination returns the correct profiles in newest-first order.

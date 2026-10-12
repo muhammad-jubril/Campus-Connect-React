@@ -13,7 +13,9 @@ import {
   getProfileByUsername,
   personFromProfileRow,
 } from "../services/supabase/profiles";
-import { followUser, getFollowStatus, unfollowUser } from "../services/supabase/follows";
+import { followUser, unfollowUser } from "../services/supabase/follows";
+import { getProfileFollowSummary } from "../services/supabase/profileFollows";
+import "../styles/profile-following.css";
 
 export default function ProfilePage() {
   const { username } = useParams();
@@ -29,11 +31,12 @@ export default function ProfilePage() {
   const [loadingProfile, setLoadingProfile] = useState(!isOwnProfile);
   const [profileRetryCount, setProfileRetryCount] = useState(0);
   const [loadingPosts, setLoadingPosts] = useState(true);
-  const [isFollowing, setIsFollowing] = useState(false);
-  const [loadingFollowStatus, setLoadingFollowStatus] = useState(false);
-  const [followStatusError, setFollowStatusError] = useState(false);
+  const [followSummary, setFollowSummary] = useState(null);
+  const [loadingFollowSummary, setLoadingFollowSummary] = useState(false);
+  const [followSummaryError, setFollowSummaryError] = useState("");
   const [followWorking, setFollowWorking] = useState(false);
   const [followRetryKey, setFollowRetryKey] = useState(0);
+  const isFollowing = Boolean(followSummary?.isFollowing);
 
   useEffect(() => {
     let active = true;
@@ -137,39 +140,42 @@ export default function ProfilePage() {
   useEffect(() => {
     let active = true;
 
-    if (isOwnProfile || !currentUser?.id || !person?.id) {
-      setIsFollowing(false);
-      setLoadingFollowStatus(false);
-      setFollowStatusError(false);
+    if (!currentUser?.id || !person?.id) {
+      setFollowSummary(null);
+      setLoadingFollowSummary(false);
+      setFollowSummaryError("");
       return () => { active = false; };
     }
 
-    setLoadingFollowStatus(true);
-    setFollowStatusError(false);
-    getFollowStatus(currentUser.id, person.id)
-      .then((following) => { if (active) setIsFollowing(following); })
+    setLoadingFollowSummary(true);
+    setFollowSummaryError("");
+    getProfileFollowSummary(person.id, currentUser.id)
+      .then((summary) => { if (active) setFollowSummary(summary); })
       .catch((error) => {
-        console.error("Could not load follow status:", error);
-        if (active) setFollowStatusError(true);
+        console.error("Could not load profile follow summary:", error);
+        if (active) {
+          setFollowSummary(null);
+          setFollowSummaryError(error?.message || "Couldn't load follower information. Try again.");
+        }
       })
-      .finally(() => { if (active) setLoadingFollowStatus(false); });
+      .finally(() => { if (active) setLoadingFollowSummary(false); });
 
     return () => { active = false; };
-  }, [isOwnProfile, currentUser?.id, person?.id, followRetryKey]);
+  }, [currentUser?.id, person?.id, followRetryKey]);
 
   async function handleFollowToggle() {
-    if (!currentUser?.id || !person?.id || isOwnProfile || followWorking || loadingFollowStatus || followStatusError) return;
+    if (!currentUser?.id || !person?.id || isOwnProfile || followWorking || loadingFollowSummary || followSummaryError) return;
     setFollowWorking(true);
     try {
       if (isFollowing) {
         await unfollowUser(currentUser.id, person.id);
-        setIsFollowing(false);
         showToast(`Unfollowed @${person.username}`);
       } else {
         await followUser(person.id);
-        setIsFollowing(true);
         showToast(`Following @${person.username}`);
       }
+      // Refresh the authoritative relationship and visible counts after the write.
+      setFollowRetryKey((key) => key + 1);
     } catch (error) {
       console.error("Follow relationship update failed:", error);
       showToast(error?.message || "Couldn't update follow status. Try again.", "error");
@@ -191,6 +197,22 @@ export default function ProfilePage() {
     setLoadingPosts(true);
     await loadPostsByAuthor(person.id, true);
     setLoadingPosts(false);
+  }
+
+  const profileUsername = person?.username || username || "";
+  const formattedConnectionCount = (value) => new Intl.NumberFormat().format(value);
+  const connectionCount = (key) => {
+    if (loadingFollowSummary) return "…";
+    if (!followSummary) return "—";
+    return formattedConnectionCount(followSummary[key]);
+  };
+
+  function openConnectionList(connectionType) {
+    if (!profileUsername) {
+      showToast("This profile has no username to open its connection list.", "error");
+      return;
+    }
+    navigate(`/profile/${encodeURIComponent(profileUsername)}/${connectionType}`);
   }
 
   if (loadingProfile && !person) {
@@ -330,22 +352,15 @@ export default function ProfilePage() {
             </div>
 
             {!isOwnProfile && (
-              followStatusError ? (
-                <div className="profile-follow-error" role="alert">
-                  <span>Couldn’t check follow status.</span>
-                  <button type="button" className="btn btn-ghost" style={{ width: "auto" }} onClick={() => setFollowRetryKey((key) => key + 1)}>Try again</button>
-                </div>
-              ) : (
-                <button
-                  type="button"
-                  className={`profile-edit-btn profile-follow-btn${isFollowing ? " is-following" : ""}`}
-                  onClick={handleFollowToggle}
-                  disabled={loadingFollowStatus || followWorking || !currentUser?.id}
-                  aria-pressed={isFollowing}
-                >
-                  {loadingFollowStatus ? "Checking…" : followWorking ? (isFollowing ? "Unfollowing…" : "Following…") : isFollowing ? "Following · Unfollow" : "Follow"}
-                </button>
-              )
+              <button
+                type="button"
+                className={`profile-edit-btn profile-follow-btn${isFollowing ? " is-following" : ""}`}
+                onClick={handleFollowToggle}
+                disabled={loadingFollowSummary || followWorking || Boolean(followSummaryError) || !currentUser?.id}
+                aria-pressed={isFollowing}
+              >
+                {loadingFollowSummary ? "Checking…" : followWorking ? (isFollowing ? "Unfollowing…" : "Following…") : isFollowing ? "Following · Unfollow" : "Follow"}
+              </button>
             )}
 
             {isOwnProfile && (
@@ -370,11 +385,31 @@ export default function ProfilePage() {
         </div>
       </div>
 
-      <div className="profile-stats">
+      <div className="profile-stats" aria-label="Profile statistics">
         <div>
           <strong>{theirPosts.length}</strong>
           <span>Posts</span>
         </div>
+        <button
+          type="button"
+          className="profile-stat-link"
+          onClick={() => openConnectionList("followers")}
+          aria-label={`View followers of @${profileUsername || "this student"}`}
+          disabled={!profileUsername}
+        >
+          <strong>{connectionCount("followers")}</strong>
+          <span>Followers</span>
+        </button>
+        <button
+          type="button"
+          className="profile-stat-link"
+          onClick={() => openConnectionList("following")}
+          aria-label={`View students followed by @${profileUsername || "this student"}`}
+          disabled={!profileUsername}
+        >
+          <strong>{connectionCount("following")}</strong>
+          <span>Following</span>
+        </button>
         <div>
           <strong>NWU</strong>
           <span>Campus</span>
@@ -384,6 +419,15 @@ export default function ProfilePage() {
           <span>Level</span>
         </div>
       </div>
+
+      {followSummaryError && (
+        <div className="profile-follow-inline-error" role="alert">
+          <span>{followSummaryError}</span>
+          <button type="button" onClick={() => setFollowRetryKey((key) => key + 1)} disabled={loadingFollowSummary}>
+            Try again
+          </button>
+        </div>
+      )}
 
       <div className="profile-section-head">
         <h3 className="section-label">

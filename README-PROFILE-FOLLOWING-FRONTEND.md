@@ -14,11 +14,11 @@
 2. Restart Vite (`Ctrl+C`, then `npm run dev`) and check the profile pages.
 3. Run `npm test`, `npm run lint`, and `npm run build` in your full project.
 
-## Backend dependency — required before real follows work
+## Backend migration — required before real follows work
 
-The checked-in source does not include a follows table or follow action. Read `PROFILE-FOLLOWING-BACKEND-CONTRACT.md` and hand it to the backend developer. This patch expects `public.follows(follower_id, following_id, created_at)`, protected by appropriate unique/check constraints, row-level security, and grants. Until it exists, the UI deliberately shows a backend-not-configured error and never pretends that a follow succeeded.
+Apply `supabase/migrations/20261012170000_profile_following_backend.sql` after the base schema, content-safety, and notification migrations. It creates or aligns `public.follows`, restricts relationship reads to unblocked pairs, restricts writes to the signed-in follower, and attaches source-keyed follow notification generation. Use `PROFILE-FOLLOWING-BACKEND-CONTRACT.md` for the expected query and RLS contract.
 
-No migrations, fake data, commits, or pushes are included.
+The profile shows an em dash and disables follow actions when follow data cannot be loaded; it never treats a missing backend table as zero relationships or successful writes.
 
 Suggested commit message after local verification:
 

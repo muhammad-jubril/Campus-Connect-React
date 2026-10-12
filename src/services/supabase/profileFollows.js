@@ -76,8 +76,9 @@ export async function followStudent(viewerId, targetId) {
 
   await ensureNoBlockBetweenViewerAndProfile(targetId, viewerId);
 
+  // The database derives follower_id from auth.uid(); table grants intentionally
+  // allow the client to provide only the destination account.
   const { error } = await supabase.from(FOLLOW_TABLE).insert({
-    follower_id: viewerId,
     following_id: targetId,
   });
 
@@ -127,9 +128,10 @@ export async function getProfileConnectionPage(
 
   const { data: relationships, error, count } = await supabase
     .from(FOLLOW_TABLE)
-    .select("follower_id,following_id,created_at", { count: "exact" })
+    .select("id,follower_id,following_id,created_at", { count: "exact" })
     .eq(relationColumn, profileId)
     .order("created_at", { ascending: false })
+    .order("id", { ascending: false })
     .range(safeOffset, safeOffset + safeLimit - 1);
 
   throwFollowError(error);

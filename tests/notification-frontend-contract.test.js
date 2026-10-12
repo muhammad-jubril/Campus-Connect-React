@@ -30,7 +30,7 @@ test("public follow profile supports server-owned follow and owner-filtered unfo
     readFile(new URL("src/pages/ProfilePage.jsx", root), "utf8"),
     readFile(new URL("src/services/supabase/follows.js", root), "utf8"),
   ]);
-  assert.match(page, /getFollowStatus\(currentUser\.id, person\.id\)/);
+  assert.match(page, /getProfileFollowSummary\(person\.id, currentUser\.id\)/);
   assert.match(page, /followUser\(person\.id\)/);
   assert.match(page, /unfollowUser\(currentUser\.id, person\.id\)/);
   assert.match(service, /insert\(\{ following_id: followingId \}\)/);
