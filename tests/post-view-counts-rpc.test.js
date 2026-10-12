@@ -46,6 +46,7 @@ test("unique view recording remains separate and idempotent per account/post", a
 
 test("forward migration removes service-role and public execute grants from aggregate RPC", async () => {
   const sql = await readFile(aclMigrationUrl, "utf8");
-  assert.match(sql, /revoke all on function public\\.get_post_view_counts\\(uuid\\[\\]\\)[\\s\\S]*?from public, anon, authenticated, service_role/i);
-  assert.match(sql, /grant execute on function public\\.get_post_view_counts\\(uuid\\[\\]\\) to authenticated/i);
+  assert.ok(sql.includes("REVOKE ALL ON FUNCTION public.get_post_view_counts(uuid[])"));
+  assert.ok(sql.includes("FROM PUBLIC, anon, authenticated, service_role"));
+  assert.ok(sql.includes("GRANT EXECUTE ON FUNCTION public.get_post_view_counts(uuid[]) TO authenticated"));
 });
