@@ -1,8 +1,9 @@
 import { supabase } from "./client";
 
 const TABLE = "notification_preferences";
-const COLUMNS = "user_id,push_likes,push_comments,push_replies,push_follows,updated_at";
+const COLUMNS = "user_id,push_enabled,push_likes,push_comments,push_replies,push_follows,updated_at";
 const PREFERENCE_FIELDS = Object.freeze([
+  "push_enabled",
   "push_likes",
   "push_comments",
   "push_replies",
@@ -10,6 +11,7 @@ const PREFERENCE_FIELDS = Object.freeze([
 ]);
 
 export const DEFAULT_NOTIFICATION_PREFERENCES = Object.freeze({
+  push_enabled: true,
   push_likes: true,
   push_comments: true,
   push_replies: true,

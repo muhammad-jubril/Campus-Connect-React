@@ -17,6 +17,6 @@ test("desktop Settings navigation opens the real Settings route, not the placeho
   assert.doesNotMatch(panel, /settings: \{[\s\S]{0,220}Coming soon/);
   assert.doesNotMatch(panel, /panelKey === "settings"/);
   assert.match(routes, /<Route path="\/settings" element=\{<ScreenLayout><SettingsPage \/><\/ScreenLayout>\}/);
-  assert.match(settingsPage, /Phone push notifications/);
+  assert.match(settingsPage, /Push notifications on this device/);
   assert.match(settingsPage, /Notification preferences|Post likes/);
 });

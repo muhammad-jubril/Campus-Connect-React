@@ -120,6 +120,9 @@ Deno.serve(async (request: Request): Promise<Response> => {
     });
     if (error) {
       const message = error.message ?? "";
+      if (/account unavailable|account is being deleted/i.test(message)) {
+        return json({ error: "account_unavailable" }, 403, cors);
+      }
       const status = message.includes("already belongs") ? 409 : message.includes("Too many") ? 429 : 400;
       return json({ error: status === 409 ? "endpoint_conflict" : status === 429 ? "subscription_limit" : "registration_failed" }, status, cors);
     }

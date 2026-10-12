@@ -25,8 +25,8 @@ The UI intentionally labels push not configured until both the public VAPID key 
 
 ## Deploy
 
-1. Apply the notification pipeline migration in the already-initialized Supabase project.
-2. Set Edge Function secrets described in `supabase/diagnostics/push-dispatch-setup.md`, deploy `push-subscriptions` and `dispatch-push-notifications`, and configure a one-minute scheduled caller for the dispatcher.
+1. Apply the canonical `supabase/migrations/` sequence in order to the intended Campus Connect project. The push/Settings contract includes `20261012140537_notifications_push_pipeline.sql`, `20261012140543_notifications_relationships.sql`, `20261012151410_install_push_dispatch_extensions.sql`, `20261012151542_notification_push_vault_runtime_access.sql`, `20261012151640_notification_push_vault_guarded_runtime_config.sql`, `20261012170749_follow_operations_and_profile_queries.sql`, `20261012203746_settings_notification_preferences.sql`, and `20261012203752_notification_preferences_master_push.sql`.
+2. Store the Vault entries described in `supabase/diagnostics/push-dispatch-setup.md`, deploy `push-subscriptions` and `dispatch-push-notifications`, and configure the one-minute scheduled caller to read the dispatch secret from Vault. Do not configure a second, divergent Edge Function secret as the source of truth.
 3. Set `VITE_WEB_PUSH_PUBLIC_KEY` and `VITE_PUSH_SUBSCRIPTION_ENDPOINT` in the frontend hosting environment, then rebuild/redeploy. The endpoint must be the `push-subscriptions` function on the configured Supabase project; the client rejects other hosts/paths before sending the user's access token.
 4. Verify Realtime publication membership, RLS and column grants in the live Supabase project.
 5. Test on supported HTTPS desktop/mobile browsers with two accounts. See the detailed setup checklist.

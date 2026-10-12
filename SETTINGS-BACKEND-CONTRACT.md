@@ -1,38 +1,69 @@
 # Campus Connect Settings — backend integration contract
 
-## Notification category preferences (migration included in this patch)
+This contract describes the implementation in this branch and records the three live migrations applied to Supabase: `20261012203746_settings_notification_preferences`, `20261012203752_notification_preferences_master_push`, and `settings_account_deletion_backend` (live migration version `20261012203901`), plus the reviewer-redaction correction in `account_deletion_reviewer_redaction`. Account deletion must remain unavailable in the UI until a successful end-to-end test with a disposable Campus Connect account has completed.
 
-Apply `supabase/migrations/20261012180000_settings_notification_preferences.sql` after `supabase/migrations/20261012120000_notifications_push_pipeline.sql` in this source bundle (or the matching version already installed in your project) and before deploying the updated `dispatch-push-notifications` Edge Function. Deploy the updated `push-subscriptions` Edge Function as well: Settings uses its authenticated, read-only `GET ?endpoint=...` operation to verify whether the current browser subscription is actually registered for the signed-in user.
+## Notification preferences
 
-The app reads and updates `public.notification_preferences` through the signed-in Supabase client. The caller does not provide `user_id`; PostgreSQL defaults it from `auth.uid()`. The table contract is:
+Apply these migrations in order after the existing notification push pipeline:
+1. `supabase/migrations/20261012203746_settings_notification_preferences.sql`
+2. `supabase/migrations/20261012203752_notification_preferences_master_push.sql`
 
-- `user_id uuid primary key references public.profiles(id) on delete cascade`
+Then deploy `supabase/functions/dispatch-push-notifications/index.ts` from this branch. It preserves the Vault-backed VAPID/dispatch-secret contract and rechecks the saved account master and category values immediately before sending.
+
+`public.notification_preferences` is the one persistent per-account preferences table:
+
+- `user_id uuid primary key references public.profiles(id) on delete cascade`; derived from `auth.uid()`
+- `push_enabled boolean not null default true`; account-wide master switch
 - `push_likes boolean not null default true`
 - `push_comments boolean not null default true`
 - `push_replies boolean not null default true`
 - `push_follows boolean not null default true`
-- `updated_at timestamptz not null default now()` (maintained by a trigger)
+- `updated_at timestamptz not null default now()`; maintained in the database
 
-RLS permits a user to read/insert/update only their row. Column grants exclude `user_id` and `updated_at` from client writes. Existing users who already have push subscriptions are seeded with all categories enabled to preserve their current opted-in behaviour.
+RLS permits each account to read/insert/update only its own row. Client column grants exclude `user_id` and `updated_at`. Existing users already having saved browser/device subscriptions are seeded with enabled category defaults by the category migration, preserving their opted-in behavior. New preferences default to true, but browser permission and a server-confirmed device subscription remain separate states.
 
-`supabase/functions/dispatch-push-notifications/index.ts` now checks the saved category preference immediately before delivery. Turning off a category suppresses only its Web Push delivery. The underlying `public.notifications` rows, unread counters and in-app history remain unchanged. Re-deploy this Edge Function after applying the migration.
+Client service contract:
+- `loadNotificationPreferences(userId)` reads or creates a default row; it omits `user_id` from client INSERT and PostgreSQL derives it from `auth.uid()`.
+- `updateNotificationPreference(userId, "push_enabled" | "push_likes" | "push_comments" | "push_replies" | "push_follows", boolean)` persists the chosen boolean.
+- The frontend must expose the account-wide `push_enabled` setting separately from the existing per-device subscription switch. The account master switch must not silently unregister the device; the device switch controls that browser subscription only.
+- After a successful write, refresh preferences from Supabase (or use the returned saved row). Settings must not claim a persisted change if the request failed.
 
-The master switch in Settings controls the current browser/device subscription using the authenticated `push-subscriptions` Edge Function. The UI reports browser permission separately from a subscription confirmed against the backend. Status checks are read-only; opening Settings will not recreate a registration deleted server-side. If a local subscription exists but no server row matches, the UI marks it unregistered and rotates it only after the user explicitly turns push on. A device permission denial does not prevent removal of a local subscription that still exists.
+The trusted dispatcher maps `like`, `comment`, `reply`, and `follow` to their category columns. It skips push if `push_enabled=false` or the mapped category is false. This only finishes/suppresses the push queue entry: it does not delete or mutate `public.notifications`, read state, counts, or underlying activity. Missing preference rows use the legacy-compatible defaults (enabled).
 
-## Account deletion endpoint (backend work still required)
+## Account deletion hybrid policy
 
-The current repository does not contain a secure `delete-account` Edge Function. The Settings UI calls `supabase.functions.invoke("delete-account", ...)`, and it treats the operation as successful **only** if the deployed function returns `{ "status": "deleted" }`. A missing function, an error, or any other response leaves the user signed in and displays an error; the frontend does not delete profile/content tables or pretend a request succeeded.
+Migrations: `supabase/migrations/20261012203901_settings_account_deletion_backend.sql`, `supabase/migrations/20261012204312_account_deletion_reviewer_redaction.sql`, `supabase/migrations/20261012210104_account_deletion_target_reference_cleanup.sql`, and `supabase/migrations/20261012210516_guard_push_registration_during_account_deletion.sql`.
+Edge Function: `supabase/functions/delete-account/index.ts`.
 
-The backend developer must implement/deploy this endpoint before account deletion can complete. Required contract:
+The function uses `SUPABASE_URL`, `SUPABASE_ANON_KEY`, and `SUPABASE_SERVICE_ROLE_KEY` from its trusted server environment. Never place the service-role key in Vite variables or the client. Deploy with JWT verification enabled. A separate 256-bit worker secret is generated into Supabase Vault by the migration. The one-minute push scheduler and its Vault secret are unchanged.
 
-1. Require and validate the caller's Supabase access token server-side; derive the account ID from the verified identity, never from request JSON.
-2. Require recent authentication or reauthentication for this destructive action.
-3. Execute the approved content cleanup/anonymization, storage cleanup, and auth-user deletion workflow on the server. Respect Marketplace `ON DELETE RESTRICT`, reporter identity/retention rules, legal/safety records, foreign keys and push subscriptions. Do not blindly delete tables from browser code.
-4. Return `{ "status": "deleted" }` only after the irreversible deletion workflow is committed. Return a non-2xx error for failures; do not return this status for a queued or partial request.
-5. Ensure a repeated request is handled safely, and avoid exposing service-role credentials to the frontend.
+### User-initiated request
 
-No deletion Edge Function or production deletion policy has been fabricated in this frontend patch. Until the endpoint is deployed and verified, Settings will say that completion could not be confirmed.
+The browser calls `supabase.functions.invoke("delete-account", { body: { confirmation: "DELETE_MY_ACCOUNT" } })`. It MUST NOT send an account ID. The function validates the bearer token with `auth.getUser(token)` and derives the only account ID from that verified user. It requires `last_sign_in_at` to be within the preceding 10 minutes; on HTTP 428 / `reauthentication_required`, the frontend should ask the user to sign in again (or reauthenticate using its configured method) and retry. The server also requires the fixed confirmation value.
 
-## Frontend verification boundary
+Response meanings:
+- `200 { "status": "deleted" }`: only after Auth deletion succeeded or the Auth API explicitly reported the user was already absent and a second lookup confirmed absence, followed by the job completion write.
+- `202 { "status": "pending" }` / `503 { "status": "pending" }`: incomplete. The user must NOT be shown a success state; the server retries using its private recovery job.
+- `202 { "status": "disabled" }`: after 30 days of failed hard-delete attempts, the function requests Supabase Auth's irreversible soft-delete mode. Supabase documents that soft-deleted Auth users retain only a hashed user identifier and cannot be restored. This is reported distinctly as `disabled`, not as full hard deletion; the deletion job clears the live user ID and is purged after 30 days. The frontend should clear local session and show a clear partial/soft-deletion message, never a success state.
 
-Repository tests can check the client contract and migration source. They cannot prove live RLS, remote migration application, Edge Function deployment, browser permission prompts or actual push delivery. Those still need validation in the configured Supabase project and on a supported HTTPS browser/device.
+### Deletion sequence and recoverability
+
+1. Create/claim a per-user private job under an advisory lock; repeat requests attach to the existing job.
+2. In one Postgres transaction, redact reports with a retention deadline, clear profile/listing target references for deleted targets, remove affected pending push batches before dependent posts/comments cascade, and remove the account's listings, authored comments/posts, likes, post views, follow edges, blocks, hidden-post rows, device subscriptions, delivery receipts, notifications, and profile. Existing foreign keys cascade where intended. No app data is removed before explicit authenticated confirmation.
+
+Content retention is intentionally dependency-scoped: all comments authored by the departing account are removed, including comments on other users' posts. When a post authored by the departing account is removed, its dependent comment/reply thread, post-level likes/views, and notifications tied to that post are removed with it because that content no longer has a surviving source post. Comments on other users' surviving posts are not removed merely because the departing account exists. The only report records retained are the explicitly anonymized moderation rows with a 180-day expiration described below.
+3. Remove objects from the user's UUID folder in only `avatars`, `post-media`, and `marketplace-images`. A database reference-check protects any URL/path still used by another surviving account, listing, post, or live report. Shared objects are queued and rechecked by a scheduled worker; transient Storage failures leave a retryable job and never return `deleted`.
+4. Call Supabase Auth Admin to delete the user (which cascades auth sessions and identities). If Auth hard deletion is already done but the final job write failed, a second Auth lookup verifies absence before completion.
+5. The migration adds a restrictive RLS policy based on an active `auth.users` + `public.profiles` row to app tables and Storage. This blocks normal authenticated table/Storage access from an old still-unexpired stateless access JWT as soon as the profile is gone; Auth deletion also revokes refresh sessions. The frontend clears local session only after the server reports `deleted`.
+
+Recovery cron calls `delete-account` every five minutes with the Vault worker secret and authenticated gateway headers; retries are idempotent. A per-run claim/lock prevents concurrent workers. Safe database cleanup rolls back atomically on error; Storage and Auth operations are outside that transaction and are handled by persisted phases. Errors are stored as non-PII codes, not raw requests/emails.
+
+### Moderation retention (finite exception)
+
+Reports involving the departing account are not left with the person's name, profile, authored excerpts, image evidence or free text when the report targets the departing account/content. Report rows retain only limited fields such as reason, status, created/review timestamps, and opaque target identifiers for safety review/appeal history. Reports filed by the departing account against someone else are retained temporarily with reporter identity and free-text removed, so the target’s own submitted evidence can still be reviewed.
+
+All report rows touched by the account receive `deletion_anonymized_at` and `retention_expires_at = now() + 180 days`; a daily database maintenance job deletes those rows once expired. The private job record has no user ID after hard deletion, stores only phase/attempt/error-code metadata, and is purged 30 days after completion. Media reference records also expire after 180 days; shared objects are retained only while an active surviving record still references them (and are removed by the worker once that reference disappears).
+
+### Live verification boundary
+
+Do not enable the deletion button until all of these are verified in a non-production test account: fresh-auth requirement, cross-account rejection, full cleanup, all three storage buckets, report redaction/expiry, auth sessions, stale JWT RLS guard, partial-failure recovery, repeated requests, and the exact server response semantics. Production deployment of the migration/Edge Function alone does not prove a complete deletion flow.

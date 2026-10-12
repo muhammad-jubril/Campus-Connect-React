@@ -4,7 +4,7 @@ import { readFile } from "node:fs/promises";
 import { groupNotifications } from "../src/utils/notificationGrouping.js";
 
 const root = new URL("../", import.meta.url);
-const migrationUrl = new URL("supabase/migrations/20261012120000_notifications_push_pipeline.sql", root);
+const migrationUrl = new URL("supabase/migrations/20261012140537_notifications_push_pipeline.sql", root);
 const subscribeUrl = new URL("supabase/functions/push-subscriptions/index.ts", root);
 const dispatchUrl = new URL("supabase/functions/dispatch-push-notifications/index.ts", root);
 const setupUrl = new URL("supabase/diagnostics/push-dispatch-setup.md", root);
@@ -80,8 +80,8 @@ test("mark-all-read refreshes the server snapshot instead of marking racing inse
 
 test("push sender guards scheduled invocations, suppresses blocked users, cleans expired subscriptions and retries", async () => {
   const source = await readFile(dispatchUrl, "utf8");
-  assert.match(source, /PUSH_DISPATCH_SECRET/);
-  assert.match(source, /constantTimeEqual/);
+  assert.match(source, /get_notification_push_runtime_config/);
+  assert.match(source, /p_dispatch_secret/);
   assert.match(source, /is_notification_pair_blocked/);
   assert.match(source, /status === 404 \|\| status === 410/);
   assert.match(source, /push_subscriptions.*delete|from\("push_subscriptions"\)\.delete/s);
