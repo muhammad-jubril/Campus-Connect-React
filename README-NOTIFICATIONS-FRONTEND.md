@@ -5,7 +5,7 @@
 - Recipient-scoped notification reads, unread count, read/unread actions, and Supabase Realtime subscription in the existing app layout and bottom navigation.
 - Client presentation grouping for likes and comments by post, replies by their comment/thread, and follows by UTC day. Grouping preserves the original notification row IDs; it does not write combined or synthetic rows to the database.
 - User-initiated Web Push subscription controls using the app's existing VitePWA service worker (`public/push-sw.js` is imported into the generated worker, not registered independently).
-- Forward migration `supabase/migrations/20261012120000_notifications_push_pipeline.sql` for private subscriptions, 60-second push batching, concurrency-safe pending group updates, retry metadata, delivery receipts, and optional hooks for real reply/follow relations where those exist.
+- Forward migration `supabase/migrations/20261012140537_notifications_push_pipeline.sql` for private subscriptions, 60-second push batching, concurrency-safe pending group updates, retry metadata, delivery receipts, and optional hooks for real reply/follow relations where those exist.
 - Supabase Edge Functions to register/remove a signed-in user's push subscription and to dispatch queued Web Push messages.
 - Backend deployment instructions at `supabase/diagnostics/push-dispatch-setup.md` and a review report at `NOTIFICATIONS-AUDIT-REPORT.md`.
 
