@@ -112,3 +112,18 @@ test("follow grouping does not merge records with invalid or missing timestamps"
   assert.equal(groups.length, 2);
   assert.ok(groups.every((group) => group.items.length === 1));
 });
+
+
+test("trusted dispatcher applies account master and category preferences without deleting in-app history", async () => {
+  const [dispatcher, masterMigration] = await Promise.all([
+    readFile(dispatchUrl, "utf8"),
+    readFile(new URL("supabase/migrations/20261012180500_notification_preferences_master_push.sql", root), "utf8"),
+  ]);
+  assert.match(dispatcher, /from\("notification_preferences"\)/);
+  assert.match(dispatcher, /select\("push_enabled,push_likes,push_comments,push_replies,push_follows"\)/);
+  assert.match(dispatcher, /preferences\?\.push_enabled === false/);
+  assert.match(dispatcher, /preferences\?\.\[preferenceField\] === false/);
+  assert.match(dispatcher, /user_disabled_push_master/);
+  assert.match(masterMigration, /ADD COLUMN IF NOT EXISTS push_enabled boolean NOT NULL DEFAULT true/i);
+  assert.doesNotMatch(dispatcher, /from\("notifications"\)\.delete\(/);
+});
