@@ -46,8 +46,8 @@ export default function AppRoutes() {
 
   if (status === STATUS.LOADING) {
     return (
-      <div style={{ display: "flex", flex: 1, alignItems: "center", justifyContent: "center" }}>
-        Loading…
+      <div className="app-initial-loading-screen" role="status" aria-label="Loading Campus Connect">
+        <img className="app-initial-loading-logo" src="/campus-connect-logo.png" alt="Campus Connect" />
       </div>
     );
   }

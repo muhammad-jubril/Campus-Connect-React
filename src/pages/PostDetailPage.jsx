@@ -12,7 +12,9 @@ import {
   getPostById,
   likePost,
   unlikePost,
+  recordPostView,
 } from "../services/supabase/posts";
+import { attachMobileKeyboardInset } from "../utils/mobileKeyboardInset";
 import {
   addComment,
   deleteComment,
@@ -40,6 +42,7 @@ export default function PostDetailPage() {
     syncPost,
     toggleLike,
     bumpCommentCount,
+    updatePostViewCount,
   } = usePosts();
   const { showToast } = useToast();
 
@@ -58,6 +61,7 @@ export default function PostDetailPage() {
   const deleteTriggerRef = useRef(null);
   const commentSectionRef = useRef(null);
   const commentInputRef = useRef(null);
+  const replyFormRef = useRef(null);
 
   const postFromContext = posts.find((item) => item.id === postId) || null;
   const cachedNavigationPost = location.state?.post?.id === postId ? location.state.post : null;
@@ -107,6 +111,29 @@ export default function PostDetailPage() {
     loadPost();
     return () => { active = false; };
   }, [postId, currentUser?.id, warmPeople, syncPost, cachedNavigationPost]);
+
+  useEffect(() => {
+    if (!postId || !currentUser?.id || visiblePost?.id !== postId) return undefined;
+    let active = true;
+
+    // Record a view only after this route has resolved to the intended, visible
+    // post. The database de-duplicates (post, viewer) pairs, so StrictMode or a
+    // retry cannot inflate counts for the same account. Failure must not block reading.
+    recordPostView(postId)
+      .then((viewCount) => {
+        if (!active) return;
+        setPost((previous) => previous?.id === postId ? { ...previous, viewCount } : previous);
+        updatePostViewCount(postId, viewCount);
+      })
+      .catch((error) => console.warn("Post view count could not be updated:", error));
+
+    return () => { active = false; };
+  }, [postId, currentUser?.id, visiblePost?.id, updatePostViewCount]);
+
+  useEffect(() => {
+    if (!replyFormRef.current) return undefined;
+    return attachMobileKeyboardInset(replyFormRef.current);
+  }, [postId, visiblePost?.id]);
 
   useEffect(() => {
     let active = true;
@@ -187,7 +214,11 @@ export default function PostDetailPage() {
 
   function startReply(comment) {
     setReplyTarget(comment);
-    window.requestAnimationFrame(() => commentInputRef.current?.focus({ preventScroll: true }));
+    // Focus during the tap gesture so mobile browsers open the soft keyboard.
+    // The composer tracks visualViewport changes to stay above that keyboard.
+    const input = commentInputRef.current;
+    input?.focus();
+    window.requestAnimationFrame(() => input?.scrollIntoView({ behavior: "smooth", block: "nearest" }));
   }
 
   async function handleSubmitComment(event) {
@@ -311,7 +342,7 @@ export default function PostDetailPage() {
           <section className="post-detail-replies" id="comments" ref={commentSectionRef} aria-labelledby="post-detail-replies-title">
             <div className="post-detail-replies-head">
               <h2 className="display" id="post-detail-replies-title">Replies</h2>
-              <span>{visiblePost.commentCount} TOTAL</span>
+              <span>{visiblePost.commentCount} {visiblePost.commentCount === 1 ? "reply" : "replies"}</span>
             </div>
 
 
@@ -379,7 +410,7 @@ export default function PostDetailPage() {
               )}
             </div>
 
-            <form className="post-detail-reply-form" onSubmit={handleSubmitComment}>
+            <form ref={replyFormRef} className="post-detail-reply-form" onSubmit={handleSubmitComment}>
               <Avatar person={currentUser} size="sm" />
               <div className="post-detail-reply-editor">
                 {replyTarget && (

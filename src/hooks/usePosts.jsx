@@ -217,6 +217,13 @@ export function PostsProvider({ children }) {
     )));
   }, []);
 
+  const updatePostViewCount = useCallback((postId, viewCount) => {
+    if (!Number.isFinite(Number(viewCount)) || Number(viewCount) < 0) return;
+    setPosts((previous) => previous.map((post) => (
+      post.id === postId ? { ...post, viewCount: Number(viewCount) } : post
+    )));
+  }, []);
+
   const addPost = useCallback((post) => {
     setPosts((prev) => [post, ...prev]);
   }, []);
@@ -322,6 +329,7 @@ export function PostsProvider({ children }) {
       loadMoreError,
       addPost,
       syncPost,
+      updatePostViewCount,
       updatePostText,
       removePost,
       hidePostFromCache,

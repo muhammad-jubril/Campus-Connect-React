@@ -71,17 +71,74 @@
   .screen-welcome .welcome-wrap .btn { max-width: 360px; }
 }
 
-/* ---------- Toast ---------- */
+/* ---------- Campus Connect toast ---------- */
 .toast {
-  position: fixed; bottom: 20px; left: 50%;
-  transform: translateX(-50%) translateY(80px);
-  background: var(--ink); color: #fff;
-  padding: 12px 20px; border-radius: 10px; font-size: 14px;
-  box-shadow: var(--shadow-lg); transition: transform .25s ease;
-  z-index: 200; max-width: 90%; text-align: center;
+  position: fixed;
+  left: 50%;
+  bottom: 20px;
+  z-index: 250;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: max-content;
+  min-width: min(190px, 92vw);
+  max-width: min(92vw, 440px);
+  box-sizing: border-box;
+  padding: 12px 16px 12px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 16px 16px 16px 6px;
+  background: linear-gradient(135deg, var(--primary-dark), var(--primary));
+  color: #fff;
+  box-shadow: 0 14px 34px rgba(18, 60, 40, 0.25), 0 3px 9px rgba(18, 60, 40, 0.12);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.4;
+  text-align: left;
+  overflow-wrap: anywhere;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transform: translate(-50%, calc(100% + 30px));
+  transition: transform .28s cubic-bezier(.22, 1, .36, 1), opacity .2s ease, visibility 0s linear .28s;
 }
-.toast.error { background: var(--accent-red); }
-.toast.show { transform: translateX(-50%) translateY(0); }
+
+.toast-mark {
+  display: grid;
+  place-items: center;
+  flex: 0 0 27px;
+  width: 27px;
+  height: 27px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.93);
+  color: var(--primary);
+  font-size: 16px;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.toast-message { min-width: 0; }
+.toast.error { background: linear-gradient(135deg, #842a22, var(--accent-red)); }
+.toast.error .toast-mark { color: var(--accent-red); }
+.toast.show {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+  transform: translate(-50%, 0);
+  transition: transform .28s cubic-bezier(.22, 1, .36, 1), opacity .2s ease, visibility 0s;
+}
+
+@media (max-width: 767px) {
+  /* Float above the bottom navigation and animate fully beyond the safe area. */
+  .toast {
+    bottom: calc(78px + env(safe-area-inset-bottom, 0px));
+    transform: translate(-50%, calc(100% + 38px + env(safe-area-inset-bottom, 0px)));
+  }
+  .toast.show { transform: translate(-50%, 0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .toast { transition: none; }
+}
 
 /* ---------- Mobile viewport: keep browser chrome outside the app canvas ----------
    The document itself must not become a second, accidental scroll container on

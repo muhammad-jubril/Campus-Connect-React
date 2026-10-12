@@ -221,6 +221,15 @@ export default function PostCard({
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" /></svg>
             <span className="comment-count">{post.commentCount}</span>
           </button>
+          {post.viewCount !== null && post.viewCount !== undefined && (
+            <span className="post-action-metric post-view-metric" aria-label={`${post.viewCount} views`} title={`${post.viewCount} views`}>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M2 12s3.6-6.5 10-6.5S22 12 22 12s-3.6 6.5-10 6.5S2 12 2 12Z" />
+                <circle cx="12" cy="12" r="2.5" />
+              </svg>
+              <span>{post.viewCount} {post.viewCount === 1 ? "view" : "views"}</span>
+            </span>
+          )}
           <button type="button" className="post-action-btn share-btn" onClick={handleShare} aria-label="Share post">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="18" cy="5" r="3" /><circle cx="6" cy="12" r="3" /><circle cx="18" cy="19" r="3" /><path d="m8.7 10.6 6.6-4.2M8.7 13.4l6.6 4.2" /></svg>
             <span>Share</span>

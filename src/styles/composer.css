@@ -66,6 +66,18 @@
   background: var(--surface); width: 100%; max-width: 480px; border-radius: 22px 22px 0 0;
   padding: 20px 18px 22px; box-shadow: var(--shadow-lg); max-height: 76vh; display: flex; flex-direction: column;
 }
+
+@media (max-width: 767px) {
+  .comments-modal-overlay {
+    padding-bottom: var(--cc-mobile-keyboard-inset, 0px);
+    box-sizing: border-box;
+  }
+  .comments-modal-card {
+    max-height: min(76vh, calc(100dvh - var(--cc-mobile-keyboard-inset, 0px) - 12px));
+    min-height: 0;
+  }
+  .comments-modal-list { min-height: 0; }
+}
 .comments-modal-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
 .comments-modal-close { width: 32px; height: 32px; border-radius: 50%; border: none; background: rgba(28,27,23,0.06); display: flex; align-items: center; justify-content: center; cursor: pointer; }
 .comments-modal-list { overflow-y: auto; flex: 1; margin-bottom: 12px; }

@@ -9,6 +9,7 @@ import { useToast } from "../../hooks/useToast";
 import { addComment, deleteComment, fetchCommentsFor } from "../../services/supabase/comments";
 import { timeAgo } from "../../utils/timeAgo";
 import { getCommentDepth } from "../../utils/commentThreads";
+import { attachMobileKeyboardInset } from "../../utils/mobileKeyboardInset";
 
 const MAX_COMMENT_LENGTH = 500;
 
@@ -27,11 +28,17 @@ export default function CommentsModal() {
   const [deleting, setDeleting] = useState(false);
   const inputRef = useRef(null);
   const dialogRef = useRef(null);
+  const overlayRef = useRef(null);
   const deleteTriggerRef = useRef(null);
   const { getPerson, warmPeople } = usePeople();
   const { activePost: post, closeComments: onClose, bumpCommentCount } = usePosts();
   const { currentUser } = useAuth();
   const { showToast } = useToast();
+
+  useEffect(() => {
+    if (!post || !overlayRef.current) return undefined;
+    return attachMobileKeyboardInset(overlayRef.current);
+  }, [post?.id]);
 
   useEffect(() => {
     if (!post) return undefined;
@@ -93,7 +100,10 @@ export default function CommentsModal() {
 
   function startReply(comment) {
     setReplyTarget(comment);
-    window.requestAnimationFrame(() => inputRef.current?.focus({ preventScroll: true }));
+    // Focus inside the click handler to preserve the mobile browser's user gesture.
+    const input = inputRef.current;
+    input?.focus();
+    window.requestAnimationFrame(() => input?.scrollIntoView({ behavior: "smooth", block: "nearest" }));
   }
 
   async function handleSend() {
@@ -155,7 +165,7 @@ export default function CommentsModal() {
   if (!post) return null;
 
   return (
-    <div className={`comments-modal-overlay ${post ? "show" : ""}`} onClick={onClose}>
+    <div ref={overlayRef} className={`comments-modal-overlay ${post ? "show" : ""}`} onClick={onClose}>
       <div
         ref={dialogRef}
         className="comments-modal-card"

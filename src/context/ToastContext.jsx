@@ -23,7 +23,8 @@ export function ToastProvider({ children }) {
         aria-live={isError ? "assertive" : "polite"}
         aria-atomic="true"
       >
-        {toast.text}
+        <span className="toast-mark" aria-hidden="true">{isError ? "!" : "✓"}</span>
+        <span className="toast-message">{toast.text}</span>
       </div>
     </ToastContext.Provider>
   );

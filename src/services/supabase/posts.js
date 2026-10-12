@@ -29,6 +29,9 @@ function postRowToPost(row) {
     likes: Number(row.like_count) || 0,
     liked: !!row.liked_by_me,
     commentCount: Number(row.comment_count) || 0,
+    viewCount: row.view_count === null || row.view_count === undefined
+      ? null
+      : Math.max(0, Number(row.view_count) || 0),
   };
 }
 
@@ -54,6 +57,34 @@ async function fetchUsernamesById(authorIds) {
   return new Map((data || []).map((profile) => [profile.id, profile.username || "unknown"]));
 }
 
+// The raw post_views table intentionally denies client reads. Fetch aggregate
+// counts through the bounded SECURITY DEFINER RPC instead, in chunks so profile
+// pages with many posts never exceed its input limit.
+async function fetchPostViewCounts(postIds) {
+  const ids = [...new Set((postIds || []).filter(Boolean))];
+  if (ids.length === 0) return new Map();
+
+  const counts = new Map();
+  for (let index = 0; index < ids.length; index += 100) {
+    const { data, error } = await supabase.rpc("get_post_view_counts", {
+      p_post_ids: ids.slice(index, index + 100),
+    });
+
+    if (error) {
+      // A missing/not-yet-deployed view-count migration must not take down the feed.
+      console.warn("Post view counts are temporarily unavailable:", error);
+      return null;
+    }
+
+    (data || []).forEach((row) => {
+      const count = Number(row.view_count);
+      if (row.post_id && Number.isFinite(count) && count >= 0) counts.set(row.post_id, count);
+    });
+  }
+
+  return counts;
+}
+
 /**
  * Fetch one feed page through the database keyset-pagination RPC.
  * The cursor values are the raw timestamp and UUID returned by the RPC;
@@ -71,9 +102,13 @@ export async function fetchFeedPage(cursor = null) {
 
   const hasMore = postRows.length === FEED_PAGE_SIZE;
   const lastRow = postRows[postRows.length - 1];
+  const viewCounts = await fetchPostViewCounts(postRows.map((row) => row.id));
 
   return {
-    posts: postRows.map(postRowToPost),
+    posts: postRows.map((row) => postRowToPost({
+      ...row,
+      view_count: viewCounts?.get(row.id) ?? null,
+    })),
     nextCursor: hasMore && lastRow
       ? { createdAt: lastRow.created_at, id: lastRow.id }
       : null,
@@ -95,6 +130,7 @@ async function fetchPostsForQuery(currentUserId, authorId = null) {
 
   const postIds = postRows.map((row) => row.id);
   const authorUsernamesPromise = fetchUsernamesById(postRows.map((row) => row.author_id));
+  const viewCountsPromise = fetchPostViewCounts(postIds);
 
   let likeCounts = {};
   let myLikes = new Set();
@@ -117,7 +153,10 @@ async function fetchPostsForQuery(currentUserId, authorId = null) {
     });
   }
 
-  const authorUsernames = await authorUsernamesPromise;
+  const [authorUsernames, viewCounts] = await Promise.all([
+    authorUsernamesPromise,
+    viewCountsPromise,
+  ]);
 
   return postRows.map((row) => postRowToPost({
     ...row,
@@ -125,6 +164,7 @@ async function fetchPostsForQuery(currentUserId, authorId = null) {
     like_count: likeCounts[row.id] || 0,
     liked_by_me: myLikes.has(row.id),
     comment_count: commentCounts[row.id] || 0,
+    view_count: viewCounts?.get(row.id) ?? null,
   }));
 }
 
@@ -138,7 +178,7 @@ export async function getPostById(postId, currentUserId) {
   if (error) throw error;
   if (!row) return null;
 
-  const [likesResult, commentsResult, likedResult, authorUsernames] = await Promise.all([
+  const [likesResult, commentsResult, likedResult, authorUsernames, viewCounts] = await Promise.all([
     supabase
       .from("likes")
       .select("user_id", { count: "exact", head: true })
@@ -156,6 +196,7 @@ export async function getPostById(postId, currentUserId) {
           .maybeSingle()
       : Promise.resolve({ data: null, error: null }),
     fetchUsernamesById([row.author_id]),
+    fetchPostViewCounts([postId]),
   ]);
 
   if (likesResult.error) throw likesResult.error;
@@ -168,6 +209,7 @@ export async function getPostById(postId, currentUserId) {
     like_count: likesResult.count || 0,
     liked_by_me: !!likedResult.data,
     comment_count: commentsResult.count || 0,
+    view_count: viewCounts?.get(postId) ?? null,
   });
 }
 
@@ -214,6 +256,7 @@ export async function createPost({ authorId, authorUsername, text, mediaType, me
     like_count: 0,
     liked_by_me: false,
     comment_count: 0,
+    view_count: 0,
   });
 }
 

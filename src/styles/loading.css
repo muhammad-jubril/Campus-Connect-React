@@ -56,3 +56,35 @@
 .avatar-default { position: relative; overflow: hidden; background: linear-gradient(145deg, rgba(30,92,62,.07), rgba(255,255,255,.72)); border: 1px solid rgba(30,92,62,.10); color: transparent; }
 .avatar-default::before { content:''; position:absolute; inset:14%; border-radius:50%; border:1px solid rgba(30,92,62,.10); box-shadow:0 0 0 9px rgba(30,92,62,.025); }
 .default-avatar-logo { width:68%; height:68%; object-fit:contain; opacity:.24; filter:saturate(.45) grayscale(.18); position:relative; z-index:1; }
+
+
+/* Branded bootstrap/auth loading state (replaces the bare "Loading…" text). */
+.app-initial-loading-screen {
+  display: flex;
+  flex: 1 1 auto;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-width: 0;
+  min-height: 100dvh;
+  padding: 24px;
+  background: var(--bg);
+}
+
+.app-initial-loading-logo {
+  display: block;
+  width: clamp(64px, 18vw, 84px);
+  height: clamp(64px, 18vw, 84px);
+  object-fit: contain;
+  filter: drop-shadow(0 8px 16px rgba(18, 60, 40, 0.12));
+  animation: campusLogoLoadingPulse 1.65s ease-in-out infinite;
+}
+
+@keyframes campusLogoLoadingPulse {
+  0%, 100% { opacity: 0.78; transform: scale(0.97); }
+  50% { opacity: 1; transform: scale(1); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .app-initial-loading-logo { animation: none; }
+}
