@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 
 const root = new URL("../", import.meta.url);
-const migrationUrl = new URL("supabase/migrations/20261012164500_follow_operations_and_profile_queries.sql", root);
+const migrationUrl = new URL("supabase/migrations/20261012170749_follow_operations_and_profile_queries.sql", root);
 const existingRelationshipUrl = new URL("supabase/migrations/20261012140543_notifications_relationships.sql", root);
 const contractUrl = new URL("NOTIFICATIONS-BACKEND-CONTRACT.md", root);
 
