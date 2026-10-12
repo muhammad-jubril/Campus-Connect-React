@@ -9,9 +9,16 @@
 - Supabase Edge Functions to register/remove a signed-in user's push subscription and to dispatch queued Web Push messages.
 - Backend deployment instructions at `supabase/diagnostics/push-dispatch-setup.md` and a review report at `NOTIFICATIONS-AUDIT-REPORT.md`.
 
-## Important current-schema boundary
+## Frontend integration handoff
 
-The repository's app code has only a post comments feature; the `comments` reads and writes have no `parent_comment_id`/nested-reply relationship. The checked-in project also has no follows table or follow/unfollow action. The migration only attaches those optional generators when a deployed database already has the required schema. As checked in, generated in-app events are likes and post comments, not real follow events or nested-comment replies.
+The backend relationship migration now adds `comments.parent_comment_id` and `public.follows`, so the Notifications contract can support real reply/follow activities after deployment. The React UI still needs to wire those source actions:
+
+- For a reply, send the parent comment ID as `parent_comment_id` with the existing comment insert. Leave it null for a top-level comment.
+- For follow/unfollow, insert/delete `public.follows` rows. Insert only `following_id`; the backend derives `follower_id` from the signed-in session.
+- Do not write to `public.notifications` in browser code. The database triggers generate all event rows and preserve their IDs.
+- For reply notification rows, both `comment_id` and `thread_id` contain the root/top-level comment ID to match the current grouping helper. The source `comments.parent_comment_id` remains the immediate reply parent.
+
+The backend code and static SQL dry-run are not proof of live delivery. The notification pipeline must be migrated, Edge Functions and secrets configured, the scheduler enabled, and a real HTTPS browser/device tested before push is called end-to-end working.
 
 The UI intentionally labels push not configured until both the public VAPID key and the authenticated subscription endpoint are set. A browser subscription alone never proves the server stored it, and no push delivery is claimed until the Edge Functions and scheduler are deployed and a device test succeeds.
 
