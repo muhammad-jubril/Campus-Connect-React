@@ -2,8 +2,7 @@
 -- Forward-only: preserves existing notification rows and app data.
 BEGIN;
 
-CREATE SCHEMA IF NOT EXISTS net;
-CREATE EXTENSION IF NOT EXISTS pg_net WITH SCHEMA net;
+CREATE EXTENSION IF NOT EXISTS pg_net;
 CREATE EXTENSION IF NOT EXISTS pg_cron;
 
 ALTER TABLE public.comments ADD COLUMN IF NOT EXISTS parent_comment_id uuid;
