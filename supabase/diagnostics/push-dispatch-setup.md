@@ -6,8 +6,8 @@ The app can register a browser subscription only after the `push-subscriptions` 
 
 Apply the following migrations in this order through the project's established Supabase migration workflow:
 
-1. `supabase/migrations/20261012120000_notifications_push_pipeline.sql` — the existing queue, subscriptions, receipts, service-role RPCs, retry handling and 60-second initial batching infrastructure.
-2. `supabase/migrations/20261012130000_notifications_relationships.sql` — adds reply parents/thread targets, server-generated per-source notification IDs, the real `public.follows` relation, configurable quiet-window settings, stricter notification RLS/column grants and block-aware selectors.
+1. `supabase/migrations/20261012140537_notifications_push_pipeline.sql` — the existing queue, subscriptions, receipts, service-role RPCs, retry handling and 60-second initial batching infrastructure.
+2. `supabase/migrations/20261012140543_notifications_relationships.sql` — adds reply parents/thread targets, server-generated per-source notification IDs, the real `public.follows` relation, configurable quiet-window settings, stricter notification RLS/column grants and block-aware selectors.
 
 They assume the existing notification/security migrations and base tables are already present. Inspect the diff and migration result; do not apply to an unrelated or empty project. Both migrations are forward-only and avoid deleting existing app/activity rows.
 
