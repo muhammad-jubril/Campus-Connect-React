@@ -12,13 +12,20 @@
 // server-side rate limits below. The service-role key never leaves this function.
 import { createClient } from "npm:@supabase/supabase-js@2.116.0";
 
-const ALLOWED_ORIGINS = (
-  Deno.env.get("ALLOWED_ORIGINS") ??
-  "https://campus-connect-224y.vercel.app,http://localhost:5173,http://127.0.0.1:5173"
-)
+// Keep the verified production domain allowed even when ALLOWED_ORIGINS is
+// configured for a preview-specific deployment. Merge env-supplied origins
+// instead of replacing the default app origins.
+const DEFAULT_ALLOWED_ORIGINS = [
+  "https://campus-connect-224y.vercel.app",
+  "https://mycampusconnectt.vercel.app",
+  "http://localhost:5173",
+  "http://127.0.0.1:5173",
+];
+const ENV_ALLOWED_ORIGINS = (Deno.env.get("ALLOWED_ORIGINS") ?? "")
   .split(",")
   .map((s) => s.trim())
   .filter(Boolean);
+const ALLOWED_ORIGINS = [...new Set([...DEFAULT_ALLOWED_ORIGINS, ...ENV_ALLOWED_ORIGINS])];
 const PREVIEW_ORIGIN = /^https:\/\/campus-connect[a-z0-9-]*\.vercel\.app$/;
 
 // Campus Wi-Fi puts many students behind one IP, so the per-IP limit is generous;
