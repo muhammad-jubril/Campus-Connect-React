@@ -66,6 +66,7 @@ test("push coalescing uses a configurable quiet window without endangering in-ap
   const sql = await readFile(migrationUrl, "utf8");
   assert.match(sql, /quiet_window_seconds integer not null default 60/i);
   assert.match(sql, /check \(quiet_window_seconds between 1 and 3600\)/i);
+  assert.match(sql, /insert into public\.notification_push_config[\s\S]*?values \(true, false, 60\)/i);
   assert.match(sql, /select c\.quiet_window_seconds/i);
   assert.match(sql, /make_interval\(secs => v_quiet_seconds\)/i);
   assert.match(sql, /pg_advisory_xact_lock/i);
