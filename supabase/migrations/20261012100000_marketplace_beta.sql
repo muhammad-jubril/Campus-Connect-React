@@ -116,7 +116,7 @@ $$;
 
 -- Replace legacy status checks (the live schema allows only active/sold) so
 -- the frontend's supported soft-removal state is enforced by the database too.
-do $
+do $$
 declare
   status_attnum smallint;
   c record;
@@ -134,7 +134,7 @@ begin
     execute format('alter table public.marketplace_listings drop constraint %I', c.conname);
   end loop;
 end
-$;
+$$;
 alter table public.marketplace_listings
   add constraint marketplace_listings_status_check
   check (status in ('active','sold','removed')) not valid;
@@ -150,7 +150,7 @@ alter table public.marketplace_listings
 -- The earlier auth.users ON DELETE CASCADE would silently delete listings;
 -- profile-level RESTRICT gives the intended account-deletion behavior. Stop if
 -- legacy rows are orphaned instead of dropping/rewriting them.
-do $
+do $$
 declare
   seller_attnum smallint;
   orphan_seller uuid;
