@@ -1,6 +1,7 @@
-// Scheduled worker. Deploy with VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY,
-// VAPID_SUBJECT and PUSH_DISPATCH_SECRET set as Supabase function secrets.
-// Configure the scheduled caller described in diagnostics/push-dispatch-setup.md.
+// Scheduled worker. VAPID credentials and the dispatch secret are stored in
+// Supabase Vault. The dispatch secret is validated by the guarded
+// service-role-only RPC before any VAPID key is returned to this worker.
+// Configure the one-minute caller described in diagnostics/push-dispatch-setup.md.
 import { createClient } from "npm:@supabase/supabase-js@2.116.0";
 import webpush from "npm:web-push@3.6.7";
 
@@ -25,15 +26,6 @@ type SubscriptionRow = { id: string; endpoint: string; p256dh: string; auth_secr
 
 function json(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json", "Cache-Control": "no-store" } });
-}
-
-function constantTimeEqual(left: string, right: string): boolean {
-  const a = new TextEncoder().encode(left);
-  const b = new TextEncoder().encode(right);
-  let diff = a.length ^ b.length;
-  const count = Math.max(a.length, b.length);
-  for (let i = 0; i < count; i++) diff |= (a[i] ?? 0) ^ (b[i] ?? 0);
-  return diff === 0;
 }
 
 function targetUrl(notification: NotificationRow, username?: string | null): string {
@@ -71,16 +63,31 @@ Deno.serve(async (request: Request): Promise<Response> => {
   if (request.method !== "POST") return json({ error: "method_not_allowed" }, 405);
   const url = Deno.env.get("SUPABASE_URL");
   const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-  const dispatchSecret = Deno.env.get("PUSH_DISPATCH_SECRET") ?? "";
-  const vapidPublicKey = Deno.env.get("VAPID_PUBLIC_KEY") ?? "";
-  const vapidPrivateKey = Deno.env.get("VAPID_PRIVATE_KEY") ?? "";
-  const vapidSubject = Deno.env.get("VAPID_SUBJECT") ?? "";
-  if (!url || !serviceKey || dispatchSecret.length < 32 || !vapidPublicKey || !vapidPrivateKey || !vapidSubject) {
-    console.error("push dispatcher has missing runtime configuration");
+  if (!url || !serviceKey) {
+    console.error("push dispatcher has missing Supabase runtime configuration");
     return json({ error: "server_configuration_error" }, 500);
   }
-  if (!constantTimeEqual(request.headers.get("x-push-dispatch-secret") ?? "", dispatchSecret)) {
-    return json({ error: "unauthorized" }, 401);
+
+  const suppliedDispatchSecret = request.headers.get("x-push-dispatch-secret") ?? "";
+  if (suppliedDispatchSecret.length < 32) return json({ error: "unauthorized" }, 401);
+
+  const admin = createClient(url, serviceKey, { auth: { persistSession: false, autoRefreshToken: false } });
+  const { data: runtimeConfig, error: configError } = await admin.rpc(
+    "get_notification_push_runtime_config",
+    { p_dispatch_secret: suppliedDispatchSecret },
+  );
+  if (configError) {
+    console.error("push dispatcher secret/config lookup failed:", configError.code ?? "unknown");
+    return json({ error: "server_configuration_error" }, 500);
+  }
+  if (!runtimeConfig) return json({ error: "unauthorized" }, 401);
+
+  const vapidPublicKey = typeof runtimeConfig.vapid_public_key === "string" ? runtimeConfig.vapid_public_key : "";
+  const vapidPrivateKey = typeof runtimeConfig.vapid_private_key === "string" ? runtimeConfig.vapid_private_key : "";
+  const vapidSubject = typeof runtimeConfig.vapid_subject === "string" ? runtimeConfig.vapid_subject : "";
+  if (!vapidPublicKey || !vapidPrivateKey || !vapidSubject) {
+    console.error("push dispatcher has incomplete VAPID runtime configuration");
+    return json({ error: "server_configuration_error" }, 500);
   }
 
   let batchLimit = 50;
@@ -96,7 +103,6 @@ Deno.serve(async (request: Request): Promise<Response> => {
   batchLimit = Math.min(Math.max(Math.trunc(batchLimit), 1), 100);
 
   webpush.setVapidDetails(vapidSubject, vapidPublicKey, vapidPrivateKey);
-  const admin = createClient(url, serviceKey, { auth: { persistSession: false, autoRefreshToken: false } });
   const { data: batches, error: claimError } = await admin.rpc("claim_push_notification_batches", { p_limit: batchLimit });
   if (claimError) {
     console.error("push queue claim failed:", claimError.code ?? "unknown");
@@ -131,6 +137,28 @@ Deno.serve(async (request: Request): Promise<Response> => {
         await admin.rpc("finish_push_notification_batch", { p_queue_id: batch.queue_id, p_outcome: "sent", p_error_code: null });
         sent++;
         continue;
+      }
+
+      // Re-check recipient-specific content hiding at send time. Reporting alone
+      // does not hide content; only an explicit hidden_posts preference suppresses
+      // that target's push, while the underlying notification remains persisted.
+      if (notification.post_id) {
+        const { data: hiddenTarget, error: hiddenError } = await admin
+          .from("hidden_posts")
+          .select("post_id")
+          .eq("user_id", notification.recipient_id)
+          .eq("post_id", notification.post_id)
+          .maybeSingle();
+        if (hiddenError) throw hiddenError;
+        if (hiddenTarget) {
+          await admin.rpc("finish_push_notification_batch", {
+            p_queue_id: batch.queue_id,
+            p_outcome: "sent",
+            p_error_code: "target_hidden_by_recipient",
+          });
+          sent++;
+          continue;
+        }
       }
 
       const { data: subscriptions, error: subscriptionsError } = await admin.from("push_subscriptions")
