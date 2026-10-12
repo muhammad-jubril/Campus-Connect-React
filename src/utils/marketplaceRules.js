@@ -26,8 +26,7 @@ export const LISTING_CONDITIONS = Object.freeze([
 
 export const LISTING_STATUSES = Object.freeze(["active", "sold", "removed"]);
 
-// This is an initial beta safeguard, not a substitute for moderation. The same
-// rule is mirrored in the SQL trigger so direct API writes are also checked.
+// This is a beta-level text filter and moderation aid, not a complete classifier.
 const PROHIBITED_ITEM_TERMS = /\b(?:firearms?|guns?|pistols?|rifles?|ammunition|explosives?|bombs?|knives?\s+for\s+combat|cocaine|heroin|methamphetamine|meth|fentanyl|illicit\s+drugs?|marijuana|cannabis|weed|alcohol|beer|wine|liquor|tobacco|cigarettes?|vapes?|nicotine|prescription[- ]only\s+(?:medicines?|medications?|drugs?)|prescription\s+(?:medicines?|medications?|drugs?)|counterfeit|stolen\s+(?:goods?|phones?|laptops?|bikes?|bicycles?|items?|property|devices?)|fake\s+branded|replica\s+brand|sex\s+toys?|adult\s+toys?|adult\s+products?|pornography)\b/i;
 const NON_PHYSICAL_SERVICE_TERMS = /(?:\b(?:tutoring|photography|graphic\s+design|repairs?|plumbing|cleaning)\s+(?:services?|available|offered|provided|sessions?|appointments?|for\s+hire)\b|\b(?:i|we)\s+(?:offer|provide|do)\s+(?:tutoring|photography|graphic\s+design|repairs?|plumbing|cleaning)\b|\bservices?\s+only\b|\bbook\s+(?:a\s+)?(?:session|appointment)\b)/i;
 

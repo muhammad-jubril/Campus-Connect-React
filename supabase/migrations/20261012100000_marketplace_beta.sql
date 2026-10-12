@@ -1,12 +1,8 @@
 -- Campus Connect Marketplace beta.
--- IMPORTANT: run supabase/diagnostics/marketplace-preflight.sql first. This
--- migration intentionally refuses to guess if an existing marketplace table
--- has a materially different core schema. Existing listing rows are retained.
+-- Before applying, run supabase/diagnostics/marketplace-preflight.sql against the live project.
+-- Existing listing rows and stored objects are preserved; incompatible legacy schemas/statuses stop the migration.
 begin;
 
--- A new table is created only if no existing marketplace_listings table exists.
--- The previously committed security-hardening migration already references
--- seller_id and images text[]; the preflight script checks the live DB details.
 do $$
 begin
   if to_regclass('public.marketplace_listings') is null then
@@ -15,7 +11,7 @@ begin
       seller_id uuid not null references public.profiles(id) on delete restrict,
       title text not null,
       description text not null,
-      price numeric(12,0) not null,
+      price numeric not null,
       category text not null,
       condition text not null,
       images text[] null,
@@ -36,15 +32,21 @@ begin
       or not exists (select 1 from information_schema.columns where table_schema='public' and table_name='marketplace_listings' and column_name='condition')
       or not exists (select 1 from information_schema.columns where table_schema='public' and table_name='marketplace_listings' and column_name='images')
       or not exists (select 1 from information_schema.columns where table_schema='public' and table_name='marketplace_listings' and column_name='created_at') then
-      raise exception 'Marketplace migration stopped: public.marketplace_listings does not match the expected core schema (id, seller_id, title, description, price, category, condition, images). Run supabase/diagnostics/marketplace-preflight.sql and reconcile the migration before retrying.';
+      raise exception 'Marketplace migration stopped: marketplace_listings does not match the expected core schema. Run the marketplace preflight query and reconcile the schema without discarding existing rows.';
     end if;
-
     if not exists (
       select 1 from information_schema.columns
-      where table_schema='public' and table_name='marketplace_listings'
-        and column_name='images' and data_type='ARRAY' and udt_name='_text'
+      where table_schema='public' and table_name='marketplace_listings' and column_name='images'
+        and data_type='ARRAY' and udt_name='_text'
     ) then
-      raise exception 'Marketplace migration stopped: marketplace_listings.images is not text[]. Do not cast or discard existing image data automatically; inspect the live schema first.';
+      raise exception 'Marketplace migration stopped: marketplace_listings.images is not text[]. Inspect the live schema before continuing.';
+    end if;
+    if not exists (
+      select 1 from information_schema.columns
+      where table_schema='public' and table_name='marketplace_listings' and column_name='price'
+        and data_type in ('numeric','integer','bigint','smallint')
+    ) then
+      raise exception 'Marketplace migration stopped: price must already be a numeric/integer type. Inspect and migrate legacy price text explicitly rather than casting it automatically.';
     end if;
   end if;
 end
@@ -57,80 +59,68 @@ alter table public.marketplace_listings
   add column if not exists negotiable boolean not null default false,
   add column if not exists updated_at timestamptz not null default now();
 
--- Refuse an existing status vocabulary we cannot safely map. Do not silently
--- reinterpret legacy data such as 'available' or 'inactive'.
+-- A scale-free numeric column preserves fractional API input so the trigger can
+-- reject it. NUMERIC(12,0) silently rounds input before a BEFORE trigger sees it.
+alter table public.marketplace_listings
+  alter column price type numeric using price::numeric;
+
 do $$
 declare
-  invalid_status text;
   status_type text;
-  has_invalid_status boolean;
-  column_type_problem text;
+  invalid_status text;
+  type_problem text;
   over_limit_seller uuid;
   over_limit_count bigint;
 begin
-  select data_type into status_type
-  from information_schema.columns
+  select data_type into status_type from information_schema.columns
   where table_schema='public' and table_name='marketplace_listings' and column_name='status';
-
   if status_type not in ('text', 'character varying') then
-    raise exception 'Marketplace migration stopped: marketplace_listings.status must be text/varchar; found %. Inspect the live schema before proceeding.', status_type;
+    raise exception 'Marketplace migration stopped: status must be text/varchar, found %. Inspect the live schema before retrying.', status_type;
   end if;
 
-  select exists(
-    select 1 from public.marketplace_listings
-    where status is null or status not in ('active', 'sold', 'removed')
-  ) into has_invalid_status;
-
-  if has_invalid_status then
-    select coalesce(status, '<NULL>') into invalid_status
-    from public.marketplace_listings
-    where status is null or status not in ('active', 'sold', 'removed')
-    limit 1;
-    raise exception 'Marketplace migration stopped: found an existing listing status (%) outside active/sold/removed. Map existing statuses explicitly before retrying.', invalid_status;
+  select coalesce(status, '<NULL>') into invalid_status
+  from public.marketplace_listings
+  where status is null or status not in ('active', 'sold', 'removed') limit 1;
+  if found then
+    raise exception 'Marketplace migration stopped: existing status (%) is not active, sold, or removed. Map legacy statuses explicitly before retrying.', invalid_status;
   end if;
 
   select string_agg(column_name || '=' || data_type, ', ')
-  into column_type_problem
+  into type_problem
   from information_schema.columns
   where table_schema='public' and table_name='marketplace_listings'
     and ((column_name in ('id','seller_id') and data_type <> 'uuid')
-      or (column_name in ('title','description','category','condition') and data_type not in ('text','character varying'))
-      or (column_name='price' and data_type not in ('numeric','integer','bigint','smallint'))
+      or (column_name in ('title','description','category','condition','status','image_path','pickup_location') and data_type not in ('text','character varying'))
+      or (column_name='price' and data_type <> 'numeric')
       or (column_name in ('created_at','updated_at') and data_type <> 'timestamp with time zone')
-      or (column_name in ('image_path','status','pickup_location') and data_type not in ('text','character varying'))
       or (column_name='negotiable' and data_type <> 'boolean'));
-
-  if column_type_problem is not null then
-    raise exception 'Marketplace migration stopped: unexpected existing marketplace column types (%). Inspect the live schema and adapt the migration rather than casting existing data.', column_type_problem;
+  if type_problem is not null then
+    raise exception 'Marketplace migration stopped: unexpected column types (%). Reconcile the live schema explicitly rather than casting/discarding data.', type_problem;
   end if;
 
-  -- Do not deploy a rule that says max three active items while silently
-  -- leaving existing accounts over the limit. Sellers must reconcile these
-  -- rows first; this migration never auto-sells or removes their listings.
   select seller_id, count(*) into over_limit_seller, over_limit_count
-  from public.marketplace_listings
-  where status = 'active'
-  group by seller_id
-  having count(*) > 3
-  limit 1;
+  from public.marketplace_listings where status='active'
+  group by seller_id having count(*) > 3 limit 1;
   if found then
-    raise exception 'Marketplace migration stopped: seller % already has % active listings. Have the seller choose items to mark sold/remove, then retry.', over_limit_seller, over_limit_count;
+    raise exception 'Marketplace migration stopped: seller % already has % active listings. Ask that seller to mark items sold/remove them, then retry.', over_limit_seller, over_limit_count;
   end if;
 end
 $$;
 
--- Existing seller IDs must also resolve to the public profile used by the app.
--- NOT VALID keeps historical rows intact while enforcing future writes.
+-- Ensure existing-but-nullable status columns also receive the beta default.
+-- The preceding block rejects null/unknown legacy values before this tightening.
+alter table public.marketplace_listings
+  alter column status set default 'active',
+  alter column status set not null;
+
+-- Make sure every seller ID maps to an existing profile without rewriting legacy rows.
 do $$
 begin
   if not exists (
-    select 1
-    from pg_constraint c
-    join pg_attribute a on a.attrelid=c.conrelid and a.attnum=any(c.conkey)
-    where c.conrelid='public.marketplace_listings'::regclass
-      and c.contype='f'
-      and a.attname='seller_id'
+    select 1 from pg_constraint c
+    where c.conrelid='public.marketplace_listings'::regclass and c.contype='f'
       and c.confrelid='public.profiles'::regclass
+      and exists (select 1 from pg_attribute a where a.attrelid=c.conrelid and a.attnum=any(c.conkey) and a.attname='seller_id')
   ) then
     alter table public.marketplace_listings
       add constraint marketplace_listings_seller_profile_fkey
@@ -139,8 +129,8 @@ begin
 end
 $$;
 
--- Legacy rows may still reference their old post-media objects. New/changed
--- images must use this dedicated bucket; old rows are not rewritten or deleted.
+-- Keep older marketplace items readable, including objects in the historic
+-- post-media bucket. New/changed images must use marketplace-images.
 alter table public.marketplace_listings drop constraint if exists listings_images_own_folder;
 alter table public.marketplace_listings drop constraint if exists marketplace_listings_images_owned_url;
 alter table public.marketplace_listings
@@ -152,23 +142,20 @@ alter table public.marketplace_listings
   ) not valid;
 
 create index if not exists marketplace_listings_active_newest_idx
-  on public.marketplace_listings (created_at desc, id desc)
-  where status = 'active';
+  on public.marketplace_listings (created_at desc, id desc) where status='active';
 create index if not exists marketplace_listings_active_category_idx
-  on public.marketplace_listings (category, created_at desc)
-  where status = 'active';
+  on public.marketplace_listings (category, created_at desc) where status='active';
 create index if not exists marketplace_listings_active_condition_idx
-  on public.marketplace_listings (condition, created_at desc)
-  where status = 'active';
+  on public.marketplace_listings (condition, created_at desc) where status='active';
 create index if not exists marketplace_listings_active_price_idx
-  on public.marketplace_listings (price, created_at desc)
-  where status = 'active';
+  on public.marketplace_listings (price, created_at desc) where status='active';
 create index if not exists marketplace_listings_seller_status_newest_idx
   on public.marketplace_listings (seller_id, status, created_at desc);
 
 create or replace function public.enforce_marketplace_listing_rules()
 returns trigger
 language plpgsql
+security definer
 set search_path = ''
 as $$
 declare
@@ -186,13 +173,11 @@ begin
        or new.created_at is distinct from old.created_at then
       raise exception 'A listing ID, seller, and creation time cannot be changed.' using errcode='23514';
     end if;
-    if new.status is distinct from old.status then
-      if not (
-        (old.status = 'active' and new.status in ('sold', 'removed'))
-        or (old.status = 'sold' and new.status = 'removed')
-      ) then
-        raise exception 'Invalid marketplace listing status transition.' using errcode='23514';
-      end if;
+    if new.status is distinct from old.status and not (
+      (old.status='active' and new.status in ('sold','removed'))
+      or (old.status='sold' and new.status='removed')
+    ) then
+      raise exception 'Invalid marketplace listing status transition.' using errcode='23514';
     end if;
     if old.status <> 'active' and (
       new.title is distinct from old.title
@@ -205,49 +190,45 @@ begin
     ) then
       raise exception 'Only active listings can have product details edited.' using errcode='23514';
     end if;
-  else
-    if new.status is distinct from 'active' then
-      raise exception 'New marketplace listings must start as active.' using errcode='23514';
-    end if;
+  elsif new.status <> 'active' then
+    raise exception 'New marketplace listings must start as active.' using errcode='23514';
   end if;
 
-  -- Revalidate only changed fields on updates to avoid blocking legacy records
-  -- from being marked sold simply because an older row lacks new beta fields.
-  if tg_op = 'INSERT' or new.title is distinct from old.title then
+  -- For legacy rows, validate fields when inserted or changed. This lets sellers
+  -- mark older listings sold even if an old row predates newer beta fields.
+  if tg_op='INSERT' or new.title is distinct from old.title then
     if new.title is null or length(btrim(new.title)) < 1 or length(btrim(new.title)) > 30 then
       raise exception 'Product titles must contain 1 to 30 characters.' using errcode='23514';
     end if;
   end if;
-  if tg_op = 'INSERT' or new.description is distinct from old.description then
+  if tg_op='INSERT' or new.description is distinct from old.description then
     if new.description is null or length(btrim(new.description)) < 1 or length(btrim(new.description)) > 100 then
       raise exception 'Descriptions must contain 1 to 100 characters.' using errcode='23514';
     end if;
   end if;
-  if tg_op = 'INSERT' or new.price is distinct from old.price then
+  if tg_op='INSERT' or new.price is distinct from old.price then
     if new.price is null or new.price < 1 or new.price > 10000000 or new.price <> trunc(new.price) then
       raise exception 'Price must be a whole NGN amount from 1 to 10000000.' using errcode='23514';
     end if;
   end if;
-  if tg_op = 'INSERT' or new.category is distinct from old.category then
-    if new.category is null or new.category not in ('Electronics', 'Books & Education', 'Fashion', 'Home & Hostel', 'Food & Groceries', 'Beauty & Personal Care', 'Sports & Fitness', 'Other') then
+  if tg_op='INSERT' or new.category is distinct from old.category then
+    if new.category is null or new.category not in ('Electronics','Books & Education','Fashion','Home & Hostel','Food & Groceries','Beauty & Personal Care','Sports & Fitness','Other') then
       raise exception 'Choose a supported physical-product category.' using errcode='23514';
     end if;
   end if;
-  if tg_op = 'INSERT' or new.condition is distinct from old.condition then
-    if new.condition is null or new.condition not in ('new', 'like_new', 'good', 'fair') then
+  if tg_op='INSERT' or new.condition is distinct from old.condition then
+    if new.condition is null or new.condition not in ('new','like_new','good','fair') then
       raise exception 'Choose a supported product condition.' using errcode='23514';
     end if;
   end if;
-  if tg_op = 'INSERT' or new.pickup_location is distinct from old.pickup_location then
+  if tg_op='INSERT' or new.pickup_location is distinct from old.pickup_location then
     if new.pickup_location is null or length(btrim(new.pickup_location)) < 1 or length(btrim(new.pickup_location)) > 120 then
       raise exception 'Pickup location must contain 1 to 120 characters.' using errcode='23514';
     end if;
   end if;
 
-  if tg_op = 'INSERT'
-     or new.title is distinct from old.title
-     or new.description is distinct from old.description then
-    listing_text := coalesce(new.title, '') || ' ' || coalesce(new.description, '');
+  if tg_op='INSERT' or new.title is distinct from old.title or new.description is distinct from old.description then
+    listing_text := coalesce(new.title,'') || ' ' || coalesce(new.description,'');
     if listing_text ~* '\m(firearms?|guns?|pistols?|rifles?|ammunition|explosives?|bombs?|cocaine|heroin|methamphetamine|meth|fentanyl|illicit[[:space:]]+drugs?|marijuana|cannabis|weed|alcohol|beer|wine|liquor|tobacco|cigarettes?|vapes?|nicotine|prescription([- ]only[[:space:]]+|[[:space:]]+)(medicines?|medications?|drugs?)|counterfeit|stolen[[:space:]]+(goods?|phones?|laptops?|bikes?|bicycles?|items?|property|devices?)|fake[[:space:]]+branded|replica[[:space:]]+brand|sex[[:space:]]+toys?|adult[[:space:]]+(toys?|products?)|pornography)\M' then
       raise exception 'This listing may include a prohibited item. Weapons, controlled drugs, alcohol, tobacco/vapes, prescription-only medicines, counterfeit or stolen goods, and adult products are not allowed.' using errcode='23514';
     end if;
@@ -255,40 +236,35 @@ begin
        or listing_text ~* '\m(i|we)[[:space:]]+(offer|provide|do)[[:space:]]+(tutoring|photography|graphic[[:space:]]+design|repairs?|plumbing|cleaning)\M'
        or listing_text ~* '\mservices?[[:space:]]+only\M'
        or listing_text ~* '\mbook[[:space:]]+(a[[:space:]]+)?(session|appointment)\M' then
-      raise exception 'Marketplace listings are for physical products only. Offers for tutoring, photography, graphic design, repair, or other services are not allowed.' using errcode='23514';
+      raise exception 'Marketplace listings are for physical products only. Service offers are not allowed.' using errcode='23514';
     end if;
   end if;
 
-  -- Product images are optional but at most one. Legacy post-media URLs are
-  -- left alone when the images array is unchanged; every new image must have a
-  -- path in this seller's folder in marketplace-images.
-  if tg_op = 'INSERT' or new.images is distinct from old.images or new.image_path is distinct from old.image_path then
-    if coalesce(cardinality(new.images), 0) > 1 then
+  -- Optional single image. On updates, older post-media URLs remain unchanged;
+  -- every new/changed image must belong to the seller's marketplace bucket path.
+  if tg_op='INSERT' or new.images is distinct from old.images or new.image_path is distinct from old.image_path then
+    if coalesce(cardinality(new.images),0) > 1 then
       raise exception 'A marketplace listing can contain only one image.' using errcode='23514';
-    end if;
-    if coalesce(cardinality(new.images), 0) = 0 then
+    elsif coalesce(cardinality(new.images),0) = 0 then
       if new.image_path is not null then
         raise exception 'An image storage path cannot be set without an image URL.' using errcode='23514';
       end if;
-    else
-      if new.image_path is null
-         or new.image_path not like new.seller_id::text || '/%'
-         or not public.urls_in_own_folder(new.images, 'marketplace-images', new.seller_id)
-         or new.images[1] not like 'https://annmbmuuiqvutgvvkpet.supabase.co/storage/v1/object/public/marketplace-images/' || new.seller_id::text || '/%' then
-        raise exception 'Product images must be uploaded to your own marketplace-images folder.' using errcode='23514';
-      end if;
+    elsif new.images[1] is null
+      or new.image_path is null
+      or new.image_path not like new.seller_id::text || '/%'
+      or not public.urls_in_own_folder(new.images, 'marketplace-images', new.seller_id)
+      or split_part(new.images[1], '/storage/v1/object/public/marketplace-images/', 2) is distinct from new.image_path then
+      raise exception 'Product images must use the seller-owned marketplace-images path and match the image URL.' using errcode='23514';
     end if;
   end if;
 
-  -- Serialize concurrent creates/status changes per seller so the count limit
-  -- cannot be raced by simultaneous authenticated API requests.
-  if new.status = 'active' then
-    perform pg_advisory_xact_lock(hashtextextended(new.seller_id::text, 0));
-    select count(*) into active_count
-    from public.marketplace_listings l
-    where l.seller_id = new.seller_id
-      and l.status = 'active'
-      and (tg_op = 'INSERT' or l.id is distinct from new.id);
+  -- Per-seller transaction advisory lock serializes concurrent creates/updates;
+  -- checking only in React would be bypassable through direct API calls.
+  if new.status='active' then
+    perform pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtextextended(new.seller_id::text, 0));
+    select count(*) into active_count from public.marketplace_listings l
+    where l.seller_id=new.seller_id and l.status='active'
+      and (tg_op='INSERT' or l.id is distinct from new.id);
     if active_count >= 3 then
       raise exception 'You can have a maximum of three active listings. Mark one sold or remove one before creating another.' using errcode='23514';
     end if;
@@ -305,155 +281,130 @@ before insert or update on public.marketplace_listings
 for each row execute function public.enforce_marketplace_listing_rules();
 revoke all on function public.enforce_marketplace_listing_rules() from public, anon, authenticated;
 
--- Only authenticated users use marketplace queries. Reset policies on this one
--- table so an older permissive SELECT policy cannot leak sold/removed rows.
+-- Reset marketplace policies so an older permissive policy cannot expose sold/removed rows.
 do $$
-declare
-  existing_policy record;
+declare p record; c record;
 begin
-  for existing_policy in
-    select policyname from pg_policies
-    where schemaname='public' and tablename='marketplace_listings'
-  loop
-    execute format('drop policy if exists %I on public.marketplace_listings', existing_policy.policyname);
+  for p in select policyname from pg_policies where schemaname='public' and tablename='marketplace_listings' loop
+    execute format('drop policy if exists %I on public.marketplace_listings', p.policyname);
+  end loop;
+  -- Table-level REVOKE does not erase legacy column-specific grants.
+  for c in select column_name from information_schema.columns where table_schema='public' and table_name='marketplace_listings' loop
+    execute format('revoke all (%I) on table public.marketplace_listings from public, anon, authenticated', c.column_name);
   end loop;
 end
 $$;
-
 alter table public.marketplace_listings enable row level security;
-revoke all on public.marketplace_listings from anon;
-revoke delete, truncate, references, trigger on public.marketplace_listings from authenticated;
-grant select, insert, update on public.marketplace_listings to authenticated;
+revoke all on public.marketplace_listings from public, anon, authenticated;
+-- Column grants deliberately exclude any extra legacy/private columns that may exist.
+grant select (id, seller_id, title, description, price, category, condition, images, image_path, status, pickup_location, negotiable, created_at, updated_at)
+  on public.marketplace_listings to authenticated;
+grant insert (seller_id, title, description, price, category, condition, images, image_path, pickup_location, negotiable)
+  on public.marketplace_listings to authenticated;
+grant update (title, description, price, category, condition, images, image_path, status, pickup_location, negotiable)
+  on public.marketplace_listings to authenticated;
+create policy marketplace_listings_select_visible on public.marketplace_listings
+  for select to authenticated using (status='active' or seller_id=(select auth.uid()));
+create policy marketplace_listings_insert_own on public.marketplace_listings
+  for insert to authenticated with check (seller_id=(select auth.uid()));
+create policy marketplace_listings_update_own on public.marketplace_listings
+  for update to authenticated using (seller_id=(select auth.uid())) with check (seller_id=(select auth.uid()));
 
-create policy marketplace_listings_select_visible
-  on public.marketplace_listings for select to authenticated
-  using (status = 'active' or seller_id = (select auth.uid()));
-create policy marketplace_listings_insert_own
-  on public.marketplace_listings for insert to authenticated
-  with check (seller_id = (select auth.uid()));
-create policy marketplace_listings_update_own
-  on public.marketplace_listings for update to authenticated
-  using (seller_id = (select auth.uid()))
-  with check (seller_id = (select auth.uid()));
-
--- Abuse reports are private to the reporter and cannot be edited/deleted from
--- the client. One report per account per listing avoids repeated submissions.
+-- One private report per reporter/listing pair, with a rolling per-account cap.
 create table if not exists public.marketplace_reports (
   id uuid primary key default gen_random_uuid(),
   listing_id uuid not null references public.marketplace_listings(id) on delete cascade,
   reporter_id uuid not null references public.profiles(id) on delete restrict,
-  reason text not null check (reason in ('prohibited_item', 'scam_or_suspicious', 'misleading_listing', 'harassment', 'other')),
+  reason text not null check (reason in ('prohibited_item','scam_or_suspicious','misleading_listing','harassment','other')),
   details text null check (details is null or char_length(details) <= 800),
   created_at timestamptz not null default now(),
   unique (listing_id, reporter_id)
 );
-create index if not exists marketplace_reports_listing_created_idx
-  on public.marketplace_reports (listing_id, created_at desc);
-create index if not exists marketplace_reports_reporter_created_idx
-  on public.marketplace_reports (reporter_id, created_at desc);
+create index if not exists marketplace_reports_listing_created_idx on public.marketplace_reports (listing_id, created_at desc);
+create index if not exists marketplace_reports_reporter_created_idx on public.marketplace_reports (reporter_id, created_at desc);
 
 create or replace function public.validate_marketplace_report()
-returns trigger
-language plpgsql
-set search_path = ''
-as $$
-declare
-  owner_id uuid;
-  listing_status text;
-  recent_report_count integer;
+returns trigger language plpgsql security definer set search_path = '' as $$
+declare owner_id uuid; listing_status text; recent_report_count integer;
 begin
   if new.reporter_id is distinct from (select auth.uid()) then
     raise exception 'A report must belong to the signed-in reporter.' using errcode='23514';
   end if;
-  select seller_id, status into owner_id, listing_status
-  from public.marketplace_listings where id = new.listing_id;
+  select seller_id, status into owner_id, listing_status from public.marketplace_listings where id=new.listing_id;
   if owner_id is null or listing_status <> 'active' then
     raise exception 'Only active listings can be reported.' using errcode='23514';
   end if;
-  if owner_id = new.reporter_id then
-    raise exception 'You cannot report your own listing.' using errcode='23514';
-  end if;
-  if new.details is not null and char_length(new.details) > 800 then
-    raise exception 'Report details must be 800 characters or fewer.' using errcode='23514';
-  end if;
-  if new.reason is null or new.reason not in ('prohibited_item', 'scam_or_suspicious', 'misleading_listing', 'harassment', 'other') then
+  if owner_id=new.reporter_id then raise exception 'You cannot report your own listing.' using errcode='23514'; end if;
+  if new.details is not null and char_length(new.details) > 800 then raise exception 'Report details must be 800 characters or fewer.' using errcode='23514'; end if;
+  if new.reason is null or new.reason not in ('prohibited_item','scam_or_suspicious','misleading_listing','harassment','other') then
     raise exception 'Choose a supported report reason.' using errcode='23514';
   end if;
-
-  -- One report per listing is not enough protection against report spam.
-  -- Serialize per account and cap new reports at ten per rolling hour.
-  perform pg_advisory_xact_lock(hashtextextended(new.reporter_id::text, 1));
-  select count(*) into recent_report_count
-  from public.marketplace_reports
-  where reporter_id = new.reporter_id
-    and created_at >= now() - interval '1 hour';
-  if recent_report_count >= 10 then
-    raise exception 'You have reached the marketplace report limit. Try again later.' using errcode='23514';
-  end if;
+  perform pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtextextended(new.reporter_id::text, 1));
+  select count(*) into recent_report_count from public.marketplace_reports
+  where reporter_id=new.reporter_id and created_at >= now() - interval '1 hour';
+  if recent_report_count >= 10 then raise exception 'You have reached the marketplace report limit. Try again later.' using errcode='23514'; end if;
   return new;
 end
 $$;
-
 drop trigger if exists marketplace_reports_validate on public.marketplace_reports;
-create trigger marketplace_reports_validate
-before insert on public.marketplace_reports
+create trigger marketplace_reports_validate before insert on public.marketplace_reports
 for each row execute function public.validate_marketplace_report();
 revoke all on function public.validate_marketplace_report() from public, anon, authenticated;
-
-alter table public.marketplace_reports enable row level security;
 do $$
-declare
-  existing_policy record;
+declare p record; c record;
 begin
-  for existing_policy in
-    select policyname from pg_policies
-    where schemaname='public' and tablename='marketplace_reports'
-  loop
-    execute format('drop policy if exists %I on public.marketplace_reports', existing_policy.policyname);
+  for p in select policyname from pg_policies where schemaname='public' and tablename='marketplace_reports' loop
+    execute format('drop policy if exists %I on public.marketplace_reports', p.policyname);
+  end loop;
+  for c in select column_name from information_schema.columns where table_schema='public' and table_name='marketplace_reports' loop
+    execute format('revoke all (%I) on table public.marketplace_reports from public, anon, authenticated', c.column_name);
   end loop;
 end
 $$;
-revoke all on public.marketplace_reports from anon;
-revoke update, delete, truncate, references, trigger on public.marketplace_reports from authenticated;
-grant select, insert on public.marketplace_reports to authenticated;
-create policy marketplace_reports_select_own
-  on public.marketplace_reports for select to authenticated
-  using (reporter_id = (select auth.uid()));
-create policy marketplace_reports_insert_own
-  on public.marketplace_reports for insert to authenticated
-  with check (
-    reporter_id = (select auth.uid())
-    and exists (
-      select 1 from public.marketplace_listings l
-      where l.id = listing_id and l.status = 'active' and l.seller_id <> (select auth.uid())
-    )
-  );
+alter table public.marketplace_reports enable row level security;
+revoke all on public.marketplace_reports from public, anon, authenticated;
+grant select (id, listing_id, reporter_id, reason, details, created_at) on public.marketplace_reports to authenticated;
+grant insert (listing_id, reporter_id, reason, details) on public.marketplace_reports to authenticated;
+create policy marketplace_reports_select_own on public.marketplace_reports for select to authenticated
+  using (reporter_id=(select auth.uid()));
+create policy marketplace_reports_insert_own on public.marketplace_reports for insert to authenticated
+  with check (reporter_id=(select auth.uid()) and exists (
+    select 1 from public.marketplace_listings l where l.id=listing_id and l.status='active' and l.seller_id <> (select auth.uid())
+  ));
 
--- Dedicated image-only bucket: feed/avatar bucket limits are untouched.
+-- Public-read bucket by design: active listing photos are public product imagery.
+-- Upload and delete paths are constrained to the authenticated seller's folder.
+-- A public bucket exposes every object in it. If a pre-existing bucket is
+-- private and already contains objects, stop rather than exposing those files
+-- implicitly; inspect/reconcile them through the preflight script first.
+do $$
+begin
+  if exists (select 1 from storage.buckets where id='marketplace-images' and public=false)
+     and exists (select 1 from storage.objects where bucket_id='marketplace-images') then
+    raise exception 'Marketplace Storage setup stopped: marketplace-images already contains objects in a private bucket. Inspect those objects before changing the bucket to public.';
+  end if;
+end
+$$;
 insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
-values ('marketplace-images', 'marketplace-images', true, 409600, array['image/jpeg', 'image/png', 'image/webp'])
-on conflict (id) do update
-set public = true,
-    file_size_limit = 409600,
-    allowed_mime_types = array['image/jpeg', 'image/png', 'image/webp'];
-
-drop policy if exists marketplace_images_public_read on storage.objects;
-create policy marketplace_images_public_read on storage.objects
-  for select to anon, authenticated
-  using (bucket_id = 'marketplace-images');
-drop policy if exists marketplace_images_insert_own_folder on storage.objects;
-create policy marketplace_images_insert_own_folder on storage.objects
-  for insert to authenticated
-  with check (
-    bucket_id = 'marketplace-images'
-    and (storage.foldername(name))[1] = (select auth.uid())::text
-  );
-drop policy if exists marketplace_images_delete_own_folder on storage.objects;
-create policy marketplace_images_delete_own_folder on storage.objects
-  for delete to authenticated
-  using (
-    bucket_id = 'marketplace-images'
-    and (storage.foldername(name))[1] = (select auth.uid())::text
-  );
+values ('marketplace-images','marketplace-images',true,409600,array['image/jpeg','image/png','image/webp'])
+on conflict (id) do update set public=true, file_size_limit=409600, allowed_mime_types=array['image/jpeg','image/png','image/webp'];
+-- Remove previous policies scoped to this bucket before replacing them. Storage
+-- policies are permissive by default; leaving an older broad insert policy in
+-- place would OR it with the owner-folder policy below.
+do $$
+declare p record;
+begin
+  for p in select policyname from pg_policies where schemaname='storage' and tablename='objects'
+    and (coalesce(qual,'') ilike '%marketplace-images%' or coalesce(with_check,'') ilike '%marketplace-images%') loop
+    execute format('drop policy if exists %I on storage.objects', p.policyname);
+  end loop;
+end
+$$;
+create policy marketplace_images_public_read on storage.objects for select to anon, authenticated
+  using (bucket_id='marketplace-images');
+create policy marketplace_images_insert_own_folder on storage.objects for insert to authenticated
+  with check (bucket_id='marketplace-images' and (storage.foldername(name))[1]=(select auth.uid())::text);
+create policy marketplace_images_delete_own_folder on storage.objects for delete to authenticated
+  using (bucket_id='marketplace-images' and (storage.foldername(name))[1]=(select auth.uid())::text);
 
 commit;
