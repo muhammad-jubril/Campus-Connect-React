@@ -24,6 +24,7 @@ import CreatePostPage from "../pages/CreatePostPage";
 import ProfilePage from "../pages/ProfilePage";
 import EditProfilePage from "../pages/EditProfilePage";
 import SearchStudentsPage from "../pages/SearchStudentsPage";
+import MarketplacePage from "../pages/MarketplacePage";
 import ComingSoonPage from "../pages/ComingSoonPage";
 import TermsPage from "../pages/TermsPage";
 import PrivacyPage from "../pages/PrivacyPage";
@@ -93,18 +94,7 @@ export default function AppRoutes() {
         <Route element={<AppLayout />}>
           <Route path="/feed" element={<FeedPage />} />
           <Route path="/post/:postId" element={<PostDetailPage />} />
-          <Route
-            path="/marketplace"
-            element={
-              <ComingSoonPage
-                eyebrow="CAMPUS MARKET"
-                title="Marketplace"
-                blurb="Buy, sell, and swap with other NWU students — coming soon."
-                icon={icon("M4 9l1.5-5h13L20 9M4 9h16v10a1 1 0 0 0 1-1zM9 13a3 3 0 0 0 6 0")}
-                shell
-              />
-            }
-          />
+          <Route path="/marketplace" element={<MarketplacePage />} />
           <Route
             path="/notifications"
             element={
