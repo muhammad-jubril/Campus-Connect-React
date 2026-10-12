@@ -4,6 +4,7 @@ import { readFile } from "node:fs/promises";
 
 const root = new URL("../", import.meta.url);
 const migrationUrl = new URL("supabase/migrations/20261012195000_settings_account_deletion_backend.sql", root);
+const targetCleanupMigrationUrl = new URL("supabase/migrations/20261012211000_account_deletion_target_reference_cleanup.sql", root);
 const reviewerRedactionMigrationUrl = new URL("supabase/migrations/20261012210000_account_deletion_reviewer_redaction.sql", root);
 const preferencesMigrationUrl = new URL("supabase/migrations/20261012180000_settings_notification_preferences.sql", root);
 const masterMigrationUrl = new URL("supabase/migrations/20261012180500_notification_preferences_master_push.sql", root);
@@ -77,6 +78,12 @@ test("deletion migration has finite moderation retention, safe dependency orderi
   assert.match(sql, /user_id IS NULL/);
   assert.match(sql, /interval '30 days'/i);
   assert.doesNotMatch(sql, /GRANT EXECUTE ON FUNCTION public\.apply_account_deletion_database_cleanup\(uuid\) TO authenticated/i);
+  const targetCleanup = await readFile(targetCleanupMigrationUrl, "utf8");
+  assert.match(targetCleanup, /ALTER TABLE public\.content_reports\s+ALTER COLUMN target_id DROP NOT NULL/i);
+  assert.match(targetCleanup, /ALTER TABLE public\.marketplace_reports\s+ALTER COLUMN listing_id DROP NOT NULL/i);
+  assert.match(targetCleanup, /target_type='profile' AND r\.target_id=v_user_id THEN NULL/i);
+  assert.match(targetCleanup, /listing_id = CASE WHEN EXISTS/i);
+  assert.ok(targetCleanup.indexOf("DELETE FROM public.push_notification_queue q") < targetCleanup.indexOf("DELETE FROM public.marketplace_listings WHERE seller_id=v_user_id"));
   const reviewerMigration = await readFile(reviewerRedactionMigrationUrl, "utf8");
   assert.match(reviewerMigration, /OR r\.reviewed_by=v_user_id/);
   assert.match(reviewerMigration, /moderator_notes = CASE WHEN .*r\.reviewed_by=v_user_id/);
