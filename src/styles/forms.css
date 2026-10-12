@@ -41,6 +41,13 @@ h2.display { font-size: 25px; margin-bottom: 4px; }
   border: none; background: transparent; padding: 4px 2px;
   font-family: 'IBM Plex Mono', monospace; font-size: 15px; outline: none; min-width: 0; flex: 1; color: var(--ink);
 }
+/* The wrapper owns the focus ring. Do not draw a second green halo around
+   the borderless input inside it. */
+.username-field input:focus {
+  border: 0;
+  outline: none;
+  box-shadow: none;
+}
 
 .select-wrap-full { flex: 1; width: 100%; background: var(--surface); border: 1.5px solid var(--line); border-radius: var(--radius); padding: 0 14px; }
 .select-wrap-full select {
