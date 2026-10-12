@@ -452,6 +452,30 @@ begin
         last_error=left(coalesce(p_error_code,'temporary_delivery_failure'),200),
         updated_at=now()
       where q.id=v_pending_id;
+
+      -- Carry per-device receipts to the merged queue ID. Without this transfer,
+      -- a device that accepted the earlier batch would be sent the same grouped
+      -- alert again after another device's transient failure.
+      insert into public.push_delivery_receipts
+        (queue_id, subscription_id, state, attempts, last_error, delivered_at, updated_at)
+      select v_pending_id, r.subscription_id, r.state, r.attempts, r.last_error, r.delivered_at, now()
+      from public.push_delivery_receipts r
+      where r.queue_id=p_queue_id
+      on conflict (queue_id, subscription_id) do update set
+        state = case
+          when public.push_delivery_receipts.state='delivered' or excluded.state='delivered' then 'delivered'
+          when public.push_delivery_receipts.state='expired' or excluded.state='expired' then 'expired'
+          when public.push_delivery_receipts.state='permanent_failure' or excluded.state='permanent_failure' then 'permanent_failure'
+          else 'retryable_failure'
+        end,
+        attempts = greatest(public.push_delivery_receipts.attempts, excluded.attempts),
+        last_error = case
+          when public.push_delivery_receipts.state='delivered' or excluded.state='delivered' then null
+          else coalesce(excluded.last_error, public.push_delivery_receipts.last_error)
+        end,
+        delivered_at = coalesce(public.push_delivery_receipts.delivered_at, excluded.delivered_at),
+        updated_at = now();
+
       update public.push_notification_queue set status='superseded', locked_at=null, updated_at=now() where id=p_queue_id;
     else
       update public.push_notification_queue set status='pending', locked_at=null,
