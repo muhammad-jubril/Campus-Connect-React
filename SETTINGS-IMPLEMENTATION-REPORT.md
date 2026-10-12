@@ -1,33 +1,36 @@
-# Campus Connect Settings — audit and implementation report
+# Campus Connect Backend Reconciliation — 12 October 2026
 
-## Source inspected
+## Scope
 
-The audit used the current GitHub `main` source containing `feat(settings): add persisted notification preferences and account controls` (`65feac8c3955f3e2a4b31a85c81a3b7a719ba212`) and independently inspected the relevant notification migrations, Edge Functions, Settings UI, and current follow frontend/backend contracts.
+This report covers the Campus Connect application and its connected Supabase project only. The separate site's news and gallery tables and storage buckets are not part of this application and were intentionally excluded.
 
-## Settings behavior and scoped fixes
+## Changes prepared in this branch
 
-- Preserved `/settings` routing and the existing hamburger-menu placement, plus links for profile editing, blocked accounts, privacy policy, and terms.
-- Push category preferences are saved to `public.notification_preferences`; the included migration restricts client row access to `auth.uid()` and grants only the preference boolean columns for insert/update. The dispatcher suppresses Web Push for an explicitly disabled category without deleting the underlying in-app notification rows.
-- **Audit fix:** push status checks previously re-registered a local push subscription as a side effect, which could undo a server-side unsubscribe/expired registration during Settings refresh. Status is now read-only through an authenticated, user-filtered GET endpoint. An unregistered local subscription can be replaced only after an explicit user enable action. The updated `push-subscriptions` Edge Function must be deployed with this client.
-- **Audit fix:** account deletion is now explicitly gated off in the UI. There is no `supabase/functions/delete-account` implementation in this repository, so enabling its confirmation button would suggest a destructive workflow that this source cannot provide. The client-side invoke/response validation remains defensive for when the endpoint is implemented.
-- **Audit fix:** included `supabase/migrations/20261012170749_follow_operations_and_profile_queries.sql`, matching the current profile frontend's five RPC calls. The main branch frontend referenced those RPCs, but the corresponding migration was only in the still-open PR #5, making the checked-in migrations inconsistent for a clean setup.
+- Restored the migration source matching the live push pipeline, relationship notifications, Vault-backed dispatcher configuration, account-wide notification preferences, and account deletion workflow.
+- Renamed/reconciled migration files to match live migration-history versions, removing stale duplicate versions from the migration source. The marketplace beta migration already enforces the title and description limits; a separate duplicate text-limit trigger was removed from the canonical migration set.
+- Restored the deployed `supabase/functions/delete-account/index.ts` source. The Settings control remains disabled: the workflow must first pass end-to-end validation against a disposable Campus Connect account, including failure/retry behavior and storage cleanup.
+- Added a persisted `push_enabled` account master switch in Settings and in the preference service. This is distinct from the existing device/browser subscription switch. The dispatcher is expected to check the account master and the four category preferences immediately before Web Push delivery.
+- Added the live upload-budget migration to the canonical source history: avatars are limited to 153,600 bytes (150 KiB), feed images to 358,400 bytes (350 KiB), and both accept JPEG, PNG, or WebP. Existing objects are preserved.
+- Added a data-preserving database hygiene migration for the missing account-deletion media foreign-key index and validation of the marketplace image-ownership constraint. Live rows were checked before the constraint was validated.
+- Added regression contract tests and transactional follow-operation diagnostics.
 
-## Account deletion is not complete
+## Live database changes made and verified
 
-Real deletion remains blocked on a concrete approved hybrid cleanup/retention policy and a secure server-side endpoint. Existing foreign keys restrict deleting profiles while marketplace listings/reports or content reports refer to them. A correct workflow must decide which records/media are deleted versus anonymized/retained, handle object storage, comments/posts/follows/notifications/push subscriptions, reauthentication, idempotent retries and partial failures, then delete the authenticated user only once database cleanup is safely committed. This audit did not fabricate that policy or implement a risky best-effort browser-side deletion.
+1. `storage.buckets`: `avatars.file_size_limit = 153600`; `post-media.file_size_limit = 358400`. Both retain the JPEG/PNG/WebP allowlist. The settings affect future uploads; old objects were not deleted or rewritten.
+2. `private.account_deletion_media_source_job_id_idx` was created to cover the `source_job_id` foreign key.
+3. `public.marketplace_listings_images_owned_url` was validated after a preflight confirmed that existing marketplace rows did not violate its predicate.
 
-## Evidence and verification
+No live account data was deleted or rewritten by these maintenance migrations. No Edge Function was redeployed by this reconciliation.
 
-- **Verified in current repository:** Settings route/menu, preference-table grants/RLS source, server dispatcher preference check, authenticated subscription endpoint, destructive-action guard, missing deletion function, Marketplace/report foreign-key restrictions, and follow frontend/backend migration mismatch.
-- **Verified through runtime testing:** `npm test` — see terminal audit results; tests assert source contracts and regression cases, not live Supabase behavior.
-- **Verified against live Supabase:** Not verified in this environment. No live database or project credentials were available through the tools used for this audit.
-- **Not verifiable in the available environment:** actual deployed migrations/RLS/Storage policies, browser push permission prompts, real device subscription delivery/expiry, or complete account deletion and retries.
+## Still requires external or end-to-end verification
 
-The JavaScript build and ESLint commands could not be run successfully in this environment because `vite` and `eslint` are not installed. Attempting an offline dependency install fails because required packages are not cached, and package-registry networking is unavailable.
+- Run CI (`npm test`, `npm run lint`, `npm run build`) for the resulting branch and resolve any failures.
+- Test category and account-wide preference behavior using separate test accounts, then verify real device delivery on HTTPS. Source tests do not prove delivery.
+- Run the secure account-deletion flow with a disposable account, test partial failures/retry/idempotency and storage cleanup, and only then decide whether to enable the Settings control.
+- Supabase's leaked-password protection remains disabled in live Auth configuration. It requires changing the Auth security setting in the Supabase dashboard; no Auth configuration setter was available through the connected tooling.
+- Re-run Supabase security/performance advisors and distinguish intentional service-only SECURITY DEFINER RPCs from any RPCs that should not be executable by client roles. Do not revoke the follow, comment-deletion, block-state, or moderation RPCs without checking their caller contract.
+- Unused-index advisor warnings are not treated as automatic drop recommendations on this young database; measure query workload before removing indexes.
 
-## Required deployment/configuration steps
+## Validation boundary
 
-1. Apply the follow RPC migration after `20261012170000_profile_following_backend.sql`, then apply `20261012180000_settings_notification_preferences.sql` after the push-pipeline migration. Verify database migration history and actual function privileges in the intended Supabase project.
-2. Deploy both updated Edge Functions: `push-subscriptions` (read-only authenticated GET status check) and `dispatch-push-notifications` (server-enforced saved category preferences). Ensure the existing `SUPABASE_URL`, anon key, service-role key, dispatcher secret, VAPID and allowed-origin configuration are correct. Never place service-role or VAPID private keys in `VITE_*` variables.
-3. Verify with two real authenticated test users that one user cannot read/change the other user's preference row or subscription; exercise all push categories; and test unsupported browsers, permission denial, expired endpoints, unsubscribe failures and refresh/retry behavior on HTTPS.
-4. Agree and document the hybrid account-deletion and retention policy, implement/deploy `delete-account` with verified caller identity and recent reauthentication, then test failure injection, retry/idempotency, foreign-key handling, storage object removal and session invalidation in staging before enabling `ACCOUNT_DELETION_BACKEND_READY`.
+The migration changes above were applied to and verified on the connected Campus Connect Supabase project. Browser push delivery, multi-user row-level security, and end-to-end account deletion have not been represented as tested. The account-deletion UI therefore remains gated off.
