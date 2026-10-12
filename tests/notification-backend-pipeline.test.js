@@ -80,8 +80,11 @@ test("mark-all-read refreshes the server snapshot instead of marking racing inse
 
 test("push sender guards scheduled invocations, suppresses blocked users, cleans expired subscriptions and retries", async () => {
   const source = await readFile(dispatchUrl, "utf8");
-  assert.match(source, /PUSH_DISPATCH_SECRET/);
-  assert.match(source, /constantTimeEqual/);
+  assert.match(source, /get_notification_push_runtime_config/);
+  assert.match(source, /p_dispatch_secret: suppliedDispatchSecret/);
+  assert.match(source, /x-push-dispatch-secret/);
+  assert.doesNotMatch(source, /Deno\\.env\\.get\\("PUSH_DISPATCH_SECRET"\\)/);
+  assert.doesNotMatch(source, /Deno\\.env\\.get\\("VAPID_PRIVATE_KEY"\\)/);
   assert.match(source, /is_notification_pair_blocked/);
   assert.match(source, /status === 404 \|\| status === 410/);
   assert.match(source, /push_subscriptions.*delete|from\("push_subscriptions"\)\.delete/s);

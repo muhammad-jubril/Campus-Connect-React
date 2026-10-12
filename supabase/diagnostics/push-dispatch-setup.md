@@ -1,6 +1,6 @@
 # Web Push deployment checklist
 
-The backend stores VAPID credentials and its dispatch secret in Supabase Vault. The dispatcher retrieves VAPID material through a service-role-only, dispatch-secret-guarded RPC. Never commit VAPID private keys, dispatch secrets, service-role keys, or real Vault values.
+The backend stores VAPID credentials and its dispatch secret in Supabase Vault. Actual delivery additionally requires the deployed dispatcher and scheduled caller. The dispatcher retrieves VAPID material through a service-role-only, dispatch-secret-guarded RPC. Never commit VAPID private keys, dispatch secrets, service-role keys, or real Vault values.
 
 ## 1. Migration order
 
@@ -21,9 +21,10 @@ Use Vault for these entries; the actual secret values are environment-specific a
 - `campus_connect_project_url`: the project's HTTPS API URL.
 - `campus_connect_anon_jwt`: the project's legacy anon JWT key. The scheduled caller uses it as `apikey` and as `Authorization: Bearer ...` to pass the Edge Function gateway's JWT verification.
 - `campus_connect_push_dispatch_secret`: a random secret of at least 32 characters.
-- `campus_connect_vapid_public_key`: the public half of the VAPID pair.
-- `campus_connect_vapid_private_key`: matching private half; never expose it to the browser.
-- `campus_connect_vapid_subject`: a valid `https://...` or `mailto:...` contact URI.
+- `VAPID_PUBLIC_KEY` → `campus_connect_vapid_public_key`: the public half of the VAPID pair.
+- `VAPID_PRIVATE_KEY` → `campus_connect_vapid_private_key`: matching private half; never expose it to the browser.
+- `VAPID_SUBJECT` → `campus_connect_vapid_subject`: a valid `https://...` or `mailto:...` contact URI.
+- `PUSH_DISPATCH_SECRET` → `campus_connect_push_dispatch_secret`: shared only by the Vault check and scheduled caller.
 
 The live Campus Connect project has all six named entries. The private key and dispatch secret are not included in browser variables or this repository.
 
