@@ -199,7 +199,7 @@ begin
     execute format('alter table public.marketplace_listings validate constraint %I', c.conname);
   end loop;
 end
-$;
+$$;
 
 -- Keep older marketplace items readable, including objects in the historic
 -- post-media bucket. New/changed images must use marketplace-images.
