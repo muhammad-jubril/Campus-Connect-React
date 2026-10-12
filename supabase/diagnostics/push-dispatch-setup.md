@@ -1,6 +1,6 @@
 # Web Push deployment checklist
 
-The backend stores VAPID credentials and its dispatch secret in Supabase Vault. Actual delivery additionally requires the deployed dispatcher and scheduled caller. The dispatcher retrieves VAPID material through a service-role-only, dispatch-secret-guarded RPC. Never commit VAPID private keys, dispatch secrets, service-role keys, or real Vault values, and never put the VAPID private key or any secret in `VITE_*`. never put this in `VITE_*`, even in deployment examples.
+Security reminder: never put this in `VITE_*` — keep VAPID private keys, dispatch secrets, service-role keys, and real Vault values out of browser code and the repository.
 
 ## 1. Migration order
 
@@ -59,7 +59,7 @@ Verify the job in `cron.job`, its history in `cron.job_run_details`, HTTP result
 
 ## 5. Quiet window and safe activation
 
-The connected Campus Connect project currently has `enabled = true` and `quiet_window_seconds = 60`; the active one-minute Cron job and Vault secret names were confirmed by read-only checks. This review did not independently verify a fresh real-device delivery, so verify provider receipts and a browser/device test before describing push as end-to-end validated. For a new environment, keep push disabled until the secrets, Edge Functions, scheduler, persisted subscription and real-device delivery test are complete. In-app notification rows are independent of push. The first event fixes its batch deadline; later events join the pending group without moving that deadline. The quiet window accepts 1–3600 seconds.
+The connected Campus Connect project currently has `enabled = true` and `quiet_window_seconds = 60`; the active one-minute Cron job and Vault secret names were confirmed by read-only checks. This review did not independently verify a fresh real-device delivery, so verify provider receipts and a browser/device test before describing push as end-to-end validated. For a new environment, keep push disabled until the secrets, Edge Functions, scheduler, persisted subscription and real-device delivery test are complete. In-app notification rows are independent of push. The first event fixes its batch deadline; later events join the pending group without moving that deadline. The quiet window defaults to 60 seconds and accepts 1–3600 seconds.
 
 Do not enable push until a supported HTTPS browser has a persisted subscription and a real-device test confirms receipt and correct click navigation. Once tested, enable it explicitly:
 
