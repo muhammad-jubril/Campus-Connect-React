@@ -92,7 +92,7 @@ test("push sender guards scheduled invocations, suppresses blocked users, cleans
   assert.match(source, /push_delivery_receipts/);
   assert.match(source, /tag: `campus-connect:/);
   const setup = await readFile(setupUrl, "utf8");
-  assert.match(setup, /never put this in `VITE_\*`/);
+  assert.match(setup, /Never put the private key in a `VITE_\\*` variable/i);
   assert.match(setup, /60 seconds/);
 });
 

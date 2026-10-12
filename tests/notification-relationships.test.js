@@ -89,7 +89,10 @@ test("dispatcher checks current blocks and hidden-post preferences before sendin
   assert.match(source, /is_notification_pair_blocked/i);
   assert.match(source, /from\("hidden_posts"\)/i);
   assert.match(source, /target_hidden_by_recipient/i);
-  assert.match(source, /PUSH_DISPATCH_SECRET/i);
+  assert.match(source, /get_notification_push_runtime_config/);
+  assert.match(source, /p_dispatch_secret: suppliedDispatchSecret/);
+  assert.match(source, /x-push-dispatch-secret/);
+  assert.doesNotMatch(source, /Deno\\.env\\.get\\("PUSH_DISPATCH_SECRET"\\)/);
   assert.match(source, /status === 404 \|\| status === 410/i);
   assert.match(source, /push_delivery_receipts/i);
   assert.match(source, /tag: \`campus-connect:/i);
