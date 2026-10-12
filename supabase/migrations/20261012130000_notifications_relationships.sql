@@ -213,6 +213,24 @@ $$;
 GRANT SELECT ON TABLE public.notifications TO authenticated;
 GRANT UPDATE (read) ON TABLE public.notifications TO authenticated;
 
+DO $
+DECLARE p record;
+BEGIN
+  FOR p IN
+    SELECT policyname FROM pg_policies
+    WHERE schemaname = 'public' AND tablename = 'notifications' AND cmd = 'SELECT'
+  LOOP
+    EXECUTE format('DROP POLICY IF EXISTS %I ON public.notifications', p.policyname);
+  END LOOP;
+END
+$;
+
+CREATE POLICY notifications_select_own
+ON public.notifications FOR SELECT TO authenticated
+USING (
+  recipient_id = (SELECT auth.uid())
+  AND NOT public.is_user_blocked(actor_id)
+);
 -- Rebuild every UPDATE policy, not just a known legacy name: permissive
 -- RLS policies are OR-combined, so an unknown older UPDATE policy must not survive.
 DO $$
@@ -426,55 +444,55 @@ DECLARE
   v_group_key text;
   v_quiet_seconds integer;
 BEGIN
-  IF NEW.recipient_id IS NULL OR NEW.actor_id IS NULL OR NEW.actor_id = NEW.recipient_id THEN
-    RETURN NEW;
-  END IF;
+  BEGIN
+    IF NEW.recipient_id IS NULL OR NEW.actor_id IS NULL OR NEW.actor_id = NEW.recipient_id THEN
+      RETURN NEW;
+    END IF;
 
-  IF public.is_notification_pair_blocked(NEW.recipient_id, NEW.actor_id) THEN
-    RETURN NEW;
-  END IF;
+    IF public.is_notification_pair_blocked(NEW.recipient_id, NEW.actor_id) THEN
+      RETURN NEW;
+    END IF;
 
-  SELECT c.quiet_window_seconds
-  INTO v_quiet_seconds
-  FROM public.notification_push_config c
-  WHERE c.singleton = true AND c.enabled = true;
-  IF NOT FOUND THEN
-    RETURN NEW;
-  END IF;
+    SELECT c.quiet_window_seconds INTO v_quiet_seconds
+    FROM public.notification_push_config c
+    WHERE c.singleton = true AND c.enabled = true;
+    IF NOT FOUND THEN RETURN NEW; END IF;
 
-  IF NEW.type = 'like' AND NEW.post_id IS NOT NULL THEN
-    v_group_key := 'like:post:' || NEW.post_id::text;
-  ELSIF NEW.type = 'comment' AND NEW.post_id IS NOT NULL THEN
-    v_group_key := 'comment:post:' || NEW.post_id::text;
-  ELSIF NEW.type = 'reply' AND COALESCE(NEW.thread_id, NEW.comment_id) IS NOT NULL THEN
-    v_group_key := 'reply:thread:' || COALESCE(NEW.thread_id, NEW.comment_id)::text;
-  ELSIF NEW.type = 'follow' THEN
-    v_group_key := 'follow:profile:' || COALESCE(NEW.profile_id, NEW.recipient_id)::text;
-  ELSE
-    RETURN NEW;
-  END IF;
+    IF NEW.type = 'like' AND NEW.post_id IS NOT NULL THEN
+      v_group_key := 'like:post:' || NEW.post_id::text;
+    ELSIF NEW.type = 'comment' AND NEW.post_id IS NOT NULL THEN
+      v_group_key := 'comment:post:' || NEW.post_id::text;
+    ELSIF NEW.type = 'reply' AND COALESCE(NEW.thread_id, NEW.comment_id) IS NOT NULL THEN
+      v_group_key := 'reply:thread:' || COALESCE(NEW.thread_id, NEW.comment_id)::text;
+    ELSIF NEW.type = 'follow' THEN
+      v_group_key := 'follow:profile:' || COALESCE(NEW.profile_id, NEW.recipient_id)::text;
+    ELSE
+      RETURN NEW;
+    END IF;
 
-  PERFORM pg_catalog.pg_advisory_xact_lock(
-    pg_catalog.hashtextextended(NEW.recipient_id::text || ':' || v_group_key, 601212)
-  );
-
-  UPDATE public.push_notification_queue q
-  SET latest_notification_id = CASE WHEN NEW.created_at >= q.last_activity_at THEN NEW.id ELSE q.latest_notification_id END,
-      activity_count = q.activity_count + 1,
-      last_activity_at = GREATEST(q.last_activity_at, NEW.created_at),
-      updated_at = now()
-  WHERE q.recipient_id = NEW.recipient_id
-    AND q.group_key = v_group_key
-    AND q.status = 'pending';
-
-  IF NOT FOUND THEN
-    INSERT INTO public.push_notification_queue
-      (recipient_id, group_key, latest_notification_id, activity_count, first_activity_at, last_activity_at, deliver_after)
-    VALUES (
-      NEW.recipient_id, v_group_key, NEW.id, 1, NEW.created_at, NEW.created_at,
-      GREATEST(NEW.created_at, clock_timestamp()) + make_interval(secs => v_quiet_seconds)
+    PERFORM pg_catalog.pg_advisory_xact_lock(
+      pg_catalog.hashtextextended(NEW.recipient_id::text || ':' || v_group_key, 601212)
     );
-  END IF;
+
+    UPDATE public.push_notification_queue q
+    SET latest_notification_id = CASE WHEN NEW.created_at >= q.last_activity_at THEN NEW.id ELSE q.latest_notification_id END,
+        activity_count = q.activity_count + 1,
+        last_activity_at = GREATEST(q.last_activity_at, NEW.created_at),
+        updated_at = now()
+    WHERE q.recipient_id = NEW.recipient_id AND q.group_key = v_group_key AND q.status = 'pending';
+
+    IF NOT FOUND THEN
+      INSERT INTO public.push_notification_queue
+        (recipient_id, group_key, latest_notification_id, activity_count, first_activity_at, last_activity_at, deliver_after)
+      VALUES (
+        NEW.recipient_id, v_group_key, NEW.id, 1, NEW.created_at, NEW.created_at,
+        GREATEST(NEW.created_at, clock_timestamp()) + make_interval(secs => v_quiet_seconds)
+      );
+    END IF;
+  EXCEPTION WHEN OTHERS THEN
+    -- A broken push queue must never roll back the persisted in-app notification.
+    RAISE WARNING 'Could not queue push for notification %: %', NEW.id, SQLERRM;
+  END;
 
   RETURN NEW;
 END
