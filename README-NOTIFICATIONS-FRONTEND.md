@@ -5,13 +5,21 @@
 - Recipient-scoped notification reads, unread count, read/unread actions, and Supabase Realtime subscription in the existing app layout and bottom navigation.
 - Client presentation grouping for likes and comments by post, replies by their comment/thread, and follows by UTC day. Grouping preserves the original notification row IDs; it does not write combined or synthetic rows to the database.
 - User-initiated Web Push subscription controls using the app's existing VitePWA service worker (`public/push-sw.js` is imported into the generated worker, not registered independently).
-- Forward migration `supabase/migrations/20261012120000_notifications_push_pipeline.sql` for private subscriptions, 60-second push batching, concurrency-safe pending group updates, retry metadata, delivery receipts, and optional hooks for real reply/follow relations where those exist.
+- Forward migration `supabase/migrations/20261012140537_notifications_push_pipeline.sql` for private subscriptions, 60-second push batching, concurrency-safe pending group updates, retry metadata, delivery receipts, and optional hooks for real reply/follow relations where those exist.
 - Supabase Edge Functions to register/remove a signed-in user's push subscription and to dispatch queued Web Push messages.
 - Backend deployment instructions at `supabase/diagnostics/push-dispatch-setup.md` and a review report at `NOTIFICATIONS-AUDIT-REPORT.md`.
 
-## Important current-schema boundary
+## Frontend integration
 
-The repository's app code has only a post comments feature; the `comments` reads and writes have no `parent_comment_id`/nested-reply relationship. The checked-in project also has no follows table or follow/unfollow action. The migration only attaches those optional generators when a deployed database already has the required schema. As checked in, generated in-app events are likes and post comments, not real follow events or nested-comment replies.
+The backend relationship migration now adds `comments.parent_comment_id` and `public.follows`, so the Notifications contract can support real reply/follow activities after deployment. The React UI now wires those source actions:
+
+- Reply buttons in the comment modal and post detail form send the target comment ID as `parent_comment_id`; top-level comments omit the field.
+- Other users’ profile pages load follow state and insert/delete `public.follows` rows. Follow inserts only `following_id`; the backend derives `follower_id` from the signed-in session.
+- In `src/services/pushNotifications.js`, direct `fetch` calls include `apikey: import.meta.env.VITE_SUPABASE_ANON_KEY` alongside `Authorization: Bearer <session access token>`. Do not put a secret/service-role key in the frontend.
+- Do not write to `public.notifications` in browser code. The database triggers generate all event rows and preserve their IDs.
+- For reply notification rows, both `comment_id` and `thread_id` contain the root/top-level comment ID to match the current grouping helper. The source `comments.parent_comment_id` remains the immediate reply parent.
+
+The backend code and static SQL dry-run are not proof of live delivery. The notification pipeline must be migrated, Edge Functions and secrets configured, the scheduler enabled, and a real HTTPS browser/device tested before push is called end-to-end working.
 
 The UI intentionally labels push not configured until both the public VAPID key and the authenticated subscription endpoint are set. A browser subscription alone never proves the server stored it, and no push delivery is claimed until the Edge Functions and scheduler are deployed and a device test succeeds.
 

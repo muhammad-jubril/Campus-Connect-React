@@ -6,7 +6,7 @@ export async function fetchCommentsFor(postId) {
   // load while author names are resolved separately below.
   const { data, error } = await supabase
     .from("comments")
-    .select("id, post_id, author_id, text, created_at")
+    .select("id, post_id, author_id, text, created_at, parent_comment_id")
     .eq("post_id", postId)
     .order("created_at", { ascending: true });
 
@@ -34,17 +34,21 @@ export async function fetchCommentsFor(postId) {
     id: row.id,
     postId: row.post_id,
     authorId: row.author_id,
+    parentCommentId: row.parent_comment_id || null,
     authorUsername: usernamesById.get(row.author_id) || "unknown",
     text: row.text,
     createdAt: new Date(row.created_at).getTime(),
   }));
 }
 
-export async function addComment({ postId, authorId, text }) {
+export async function addComment({ postId, authorId, text, parentCommentId = null }) {
+  const commentDraft = { post_id: postId, author_id: authorId, text };
+  if (parentCommentId) commentDraft.parent_comment_id = parentCommentId;
+
   const { data, error } = await supabase
     .from("comments")
-    .insert({ post_id: postId, author_id: authorId, text })
-    .select("id, post_id, author_id, text, created_at")
+    .insert(commentDraft)
+    .select("id, post_id, author_id, text, created_at, parent_comment_id")
     .single();
   if (error) throw error;
   return data;

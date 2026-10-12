@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from "react";
+
+import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import Avatar from "../components/common/Avatar";
 import FeedSkeleton from "../components/common/Skeleton";
@@ -7,26 +8,19 @@ import ContentSafetyMenu from "../components/safety/ContentSafetyMenu";
 import MobileMenuButton from "../components/layout/MobileMenuButton";
 import { useAuth } from "../hooks/useAuth";
 import { usePosts } from "../hooks/usePosts";
+import { useToast } from "../hooks/useToast";
 import {
   getProfileByUsername,
   personFromProfileRow,
 } from "../services/supabase/profiles";
-import {
-  followStudent,
-  getProfileFollowSummary,
-  unfollowStudent,
-} from "../services/supabase/profileFollows";
-import "../styles/profile-following.css";
-
-function formatCount(value) {
-  return new Intl.NumberFormat().format(value);
-}
+import { followUser, getFollowStatus, unfollowUser } from "../services/supabase/follows";
 
 export default function ProfilePage() {
   const { username } = useParams();
   const { currentUser } = useAuth();
   const { posts, postsError, loadPostsByAuthor } = usePosts();
   const navigate = useNavigate();
+  const { showToast } = useToast();
   const isOwnProfile = !username || username === currentUser?.username;
 
   const [person, setPerson] = useState(isOwnProfile ? currentUser : null);
@@ -35,17 +29,11 @@ export default function ProfilePage() {
   const [loadingProfile, setLoadingProfile] = useState(!isOwnProfile);
   const [profileRetryCount, setProfileRetryCount] = useState(0);
   const [loadingPosts, setLoadingPosts] = useState(true);
-  const [followSummary, setFollowSummary] = useState({
-    profileId: null,
-    status: "idle",
-    value: null,
-    error: "",
-  });
-  const [followSummaryRetry, setFollowSummaryRetry] = useState(0);
-  const [followActionBusy, setFollowActionBusy] = useState(false);
-  const [followActionError, setFollowActionError] = useState("");
-  const followActionLockRef = useRef(false);
-  const followSummaryRequestRef = useRef(0);
+  const [isFollowing, setIsFollowing] = useState(false);
+  const [loadingFollowStatus, setLoadingFollowStatus] = useState(false);
+  const [followStatusError, setFollowStatusError] = useState(false);
+  const [followWorking, setFollowWorking] = useState(false);
+  const [followRetryKey, setFollowRetryKey] = useState(0);
 
   useEffect(() => {
     let active = true;
@@ -132,7 +120,7 @@ export default function ProfilePage() {
       if (active) setLoadingPosts(false);
     }
 
-    void loadProfileAndPosts();
+    loadProfileAndPosts();
 
     return () => {
       active = false;
@@ -145,40 +133,50 @@ export default function ProfilePage() {
     profileRetryCount,
   ]);
 
+
   useEffect(() => {
     let active = true;
-    const requestId = ++followSummaryRequestRef.current;
 
-    if (!person?.id || !currentUser?.id) {
-      setFollowSummary({ profileId: person?.id || null, status: "idle", value: null, error: "" });
+    if (isOwnProfile || !currentUser?.id || !person?.id) {
+      setIsFollowing(false);
+      setLoadingFollowStatus(false);
+      setFollowStatusError(false);
       return () => { active = false; };
     }
 
-    setFollowSummary({ profileId: person.id, status: "loading", value: null, error: "" });
-    setFollowActionError("");
-
-    getProfileFollowSummary(person.id, currentUser.id)
-      .then((value) => {
-        if (active && requestId === followSummaryRequestRef.current) {
-          setFollowSummary({ profileId: person.id, status: "ready", value, error: "" });
-        }
-      })
+    setLoadingFollowStatus(true);
+    setFollowStatusError(false);
+    getFollowStatus(currentUser.id, person.id)
+      .then((following) => { if (active) setIsFollowing(following); })
       .catch((error) => {
-        if (active && requestId === followSummaryRequestRef.current) {
-          console.error("Profile follow summary failed:", error);
-          setFollowSummary({
-            profileId: person.id,
-            status: "error",
-            value: null,
-            error: error.message || "Couldn't load followers and following.",
-          });
-        }
-      });
+        console.error("Could not load follow status:", error);
+        if (active) setFollowStatusError(true);
+      })
+      .finally(() => { if (active) setLoadingFollowStatus(false); });
 
-    return () => {
-      active = false;
-    };
-  }, [person?.id, currentUser?.id, followSummaryRetry]);
+    return () => { active = false; };
+  }, [isOwnProfile, currentUser?.id, person?.id, followRetryKey]);
+
+  async function handleFollowToggle() {
+    if (!currentUser?.id || !person?.id || isOwnProfile || followWorking || loadingFollowStatus || followStatusError) return;
+    setFollowWorking(true);
+    try {
+      if (isFollowing) {
+        await unfollowUser(currentUser.id, person.id);
+        setIsFollowing(false);
+        showToast(`Unfollowed @${person.username}`);
+      } else {
+        await followUser(person.id);
+        setIsFollowing(true);
+        showToast(`Following @${person.username}`);
+      }
+    } catch (error) {
+      console.error("Follow relationship update failed:", error);
+      showToast(error?.message || "Couldn't update follow status. Try again.", "error");
+    } finally {
+      setFollowWorking(false);
+    }
+  }
 
   function handleRetryProfile() {
     setLoadingProfile(true);
@@ -193,69 +191,6 @@ export default function ProfilePage() {
     setLoadingPosts(true);
     await loadPostsByAuthor(person.id, true);
     setLoadingPosts(false);
-  }
-
-  async function handleToggleFollow() {
-    if (
-      followActionLockRef.current ||
-      isOwnProfile ||
-      !currentUser?.id ||
-      !person?.id ||
-      followSummary.status !== "ready" ||
-      !followSummary.value
-    ) return;
-
-    followActionLockRef.current = true;
-    setFollowActionBusy(true);
-    setFollowActionError("");
-
-    const wasFollowing = followSummary.value.isFollowing;
-    const nextIsFollowing = !wasFollowing;
-    const profileId = person.id;
-    const oldSummary = followSummary.value;
-
-    try {
-      if (nextIsFollowing) {
-        await followStudent(currentUser.id, profileId);
-      } else {
-        await unfollowStudent(currentUser.id, profileId);
-      }
-
-      // Reflect the confirmed mutation immediately; then reconcile with exact
-      // server counts so counts remain correct if another tab acted as well.
-      setFollowSummary({
-        profileId,
-        status: "ready",
-        value: {
-          ...oldSummary,
-          isFollowing: nextIsFollowing,
-          followers: Math.max(0, oldSummary.followers + (nextIsFollowing ? 1 : -1)),
-        },
-        error: "",
-      });
-
-      try {
-        const latest = await getProfileFollowSummary(profileId, currentUser.id);
-        if (person?.id === profileId) {
-          setFollowSummary({ profileId, status: "ready", value: latest, error: "" });
-        }
-      } catch (refreshError) {
-        console.warn("Follow change succeeded but summary refresh failed:", refreshError);
-        setFollowActionError("Your change was saved, but the counts couldn't be refreshed. Retry follow data below.");
-      }
-    } catch (error) {
-      console.error("Follow change failed:", error);
-      setFollowActionError(error.message || "Couldn't update this follow. Please try again.");
-    } finally {
-      followActionLockRef.current = false;
-      setFollowActionBusy(false);
-    }
-  }
-
-  function openConnectionList(connectionType) {
-    const profileUsername = person?.username || currentUser?.username;
-    if (!profileUsername) return;
-    navigate(`/profile/${encodeURIComponent(profileUsername)}/${connectionType}`);
   }
 
   if (loadingProfile && !person) {
@@ -320,15 +255,6 @@ export default function ProfilePage() {
   if (!person) return null;
 
   const theirPosts = posts.filter((post) => post.authorId === person.id);
-  const currentFollowSummary = followSummary.profileId === person.id ? followSummary : null;
-  const stats = currentFollowSummary?.status === "ready" ? currentFollowSummary.value : null;
-  const followButtonLabel = followActionBusy
-    ? "Updating…"
-    : stats?.isFollowing
-      ? "Following"
-      : currentFollowSummary?.status === "loading"
-        ? "Checking…"
-        : "Follow";
 
   return (
     <div className="profile-page">
@@ -358,7 +284,7 @@ export default function ProfilePage() {
                 <p className="profile-card-username">@{person.username}</p>
               </div>
 
-              {isOwnProfile ? (
+              {isOwnProfile && (
                 <button
                   type="button"
                   className="profile-edit-icon"
@@ -381,30 +307,16 @@ export default function ProfilePage() {
                     <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L8 18l-4 1 1-4Z" />
                   </svg>
                 </button>
-              ) : (
-                <div className="profile-card-actions">
-                  <button
-                    type="button"
-                    className={`profile-follow-btn${stats?.isFollowing ? " is-following" : ""}`}
-                    onClick={handleToggleFollow}
-                    disabled={
-                      followActionBusy ||
-                      currentFollowSummary?.status !== "ready" ||
-                      !currentFollowSummary?.value
-                    }
-                    aria-pressed={stats?.isFollowing === true}
-                  >
-                    {followButtonLabel}
-                  </button>
-                  <ContentSafetyMenu
-                    targetType="account"
-                    targetId={person.id}
-                    reportedUserId={person.id}
-                    targetAuthorId={person.id}
-                    targetUsername={person.username}
-                    targetLabel="account"
-                  />
-                </div>
+              )}
+              {!isOwnProfile && (
+                <ContentSafetyMenu
+                  targetType="account"
+                  targetId={person.id}
+                  reportedUserId={person.id}
+                  targetAuthorId={person.id}
+                  targetUsername={person.username}
+                  targetLabel="account"
+                />
               )}
             </div>
 
@@ -416,6 +328,25 @@ export default function ProfilePage() {
               {person.department || "Department not set"}
               {person.level ? ` · ${person.level} Level` : ""}
             </div>
+
+            {!isOwnProfile && (
+              followStatusError ? (
+                <div className="profile-follow-error" role="alert">
+                  <span>Couldn’t check follow status.</span>
+                  <button type="button" className="btn btn-ghost" style={{ width: "auto" }} onClick={() => setFollowRetryKey((key) => key + 1)}>Try again</button>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  className={`profile-edit-btn profile-follow-btn${isFollowing ? " is-following" : ""}`}
+                  onClick={handleFollowToggle}
+                  disabled={loadingFollowStatus || followWorking || !currentUser?.id}
+                  aria-pressed={isFollowing}
+                >
+                  {loadingFollowStatus ? "Checking…" : followWorking ? (isFollowing ? "Unfollowing…" : "Following…") : isFollowing ? "Following · Unfollow" : "Follow"}
+                </button>
+              )
+            )}
 
             {isOwnProfile && (
               <button
@@ -439,40 +370,11 @@ export default function ProfilePage() {
         </div>
       </div>
 
-      {!isOwnProfile && followActionError && (
-        <div className="profile-follow-inline-error" role="alert">
-          <span>{followActionError}</span>
-          {followActionError.includes("counts couldn't be refreshed") && (
-            <button type="button" onClick={() => setFollowSummaryRetry((count) => count + 1)}>
-              Retry follow data
-            </button>
-          )}
-        </div>
-      )}
-
-      <div className="profile-stats" aria-label="Profile statistics">
+      <div className="profile-stats">
         <div>
           <strong>{theirPosts.length}</strong>
           <span>Posts</span>
         </div>
-        <button
-          type="button"
-          className="profile-stat-link"
-          onClick={() => openConnectionList("followers")}
-          aria-label={`View followers for ${person.name || person.username}`}
-        >
-          <strong>{stats ? formatCount(stats.followers) : currentFollowSummary?.status === "loading" ? "…" : "—"}</strong>
-          <span>Followers</span>
-        </button>
-        <button
-          type="button"
-          className="profile-stat-link"
-          onClick={() => openConnectionList("following")}
-          aria-label={`View accounts ${person.name || person.username} follows`}
-        >
-          <strong>{stats ? formatCount(stats.following) : currentFollowSummary?.status === "loading" ? "…" : "—"}</strong>
-          <span>Following</span>
-        </button>
         <div>
           <strong>NWU</strong>
           <span>Campus</span>
@@ -482,15 +384,6 @@ export default function ProfilePage() {
           <span>Level</span>
         </div>
       </div>
-
-      {currentFollowSummary?.status === "error" && (
-        <div className="profile-follow-inline-error" role="alert">
-          <span>{currentFollowSummary.error}</span>
-          <button type="button" onClick={() => setFollowSummaryRetry((count) => count + 1)}>
-            Retry follow data
-          </button>
-        </div>
-      )}
 
       <div className="profile-section-head">
         <h3 className="section-label">

@@ -43,6 +43,13 @@
 .comment-author { font-size: 13px; font-weight: 600; color: var(--ink); }
 .comment-text { font-size: 13.5px; color: rgba(28,27,23,0.8); line-height: 1.4; }
 .comment-time { font-size: 11px; color: rgba(28,27,23,0.4); margin-top: 2px; }
+
+.comment-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.comment-reply-action { border: 0; padding: 2px 4px; border-radius: 5px; background: transparent; color: var(--primary); font-size: 10px; font-weight: 700; cursor: pointer; }
+.comment-reply-action:disabled { opacity: 0.5; cursor: not-allowed; }
+.comment-reply-context { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 7px 10px; margin-bottom: 8px; border: 1px solid var(--line); border-radius: 9px; color: rgba(28,27,23,0.68); font-size: 11px; }
+.comment-reply-context button { border: 0; background: transparent; color: var(--primary); font-size: 11px; font-weight: 700; cursor: pointer; }
+.comment-item-nested { padding-left: 8px; border-left: 2px solid rgba(30,92,62,0.15); }
 .comment-input-row { display: flex; gap: 8px; margin-bottom: 10px; }
 .comment-input-row input {
   flex: 1; padding: 10px 14px; border: 1.5px solid var(--line); border-radius: 10px;

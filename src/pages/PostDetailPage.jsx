@@ -19,6 +19,7 @@ import {
   fetchCommentsFor,
 } from "../services/supabase/comments";
 import { timeAgo } from "../utils/timeAgo";
+import { getCommentDepth } from "../utils/commentThreads";
 
 const MAX_COMMENT_LENGTH = 500;
 
@@ -50,6 +51,7 @@ export default function PostDetailPage() {
   const [commentsError, setCommentsError] = useState(false);
   const [commentsReloadKey, setCommentsReloadKey] = useState(0);
   const [commentText, setCommentText] = useState("");
+  const [replyTarget, setReplyTarget] = useState(null);
   const [sendingComment, setSendingComment] = useState(false);
   const [deletingCommentId, setDeletingCommentId] = useState(null);
   const [pendingDeleteComment, setPendingDeleteComment] = useState(null);
@@ -110,6 +112,7 @@ export default function PostDetailPage() {
     let active = true;
     setComments(null);
     setCommentsError(false);
+    setReplyTarget(null);
 
     fetchCommentsFor(postId)
       .then((rows) => {
@@ -182,6 +185,11 @@ export default function PostDetailPage() {
     } : previous);
   }
 
+  function startReply(comment) {
+    setReplyTarget(comment);
+    window.requestAnimationFrame(() => commentInputRef.current?.focus({ preventScroll: true }));
+  }
+
   async function handleSubmitComment(event) {
     event.preventDefault();
     const trimmed = commentText.trim();
@@ -193,12 +201,14 @@ export default function PostDetailPage() {
         postId,
         authorId: currentUser.id,
         text: trimmed,
+        parentCommentId: replyTarget?.id || null,
       });
 
       const nextComment = {
         id: inserted.id,
         postId: inserted.post_id,
         authorId: inserted.author_id,
+        parentCommentId: inserted.parent_comment_id || null,
         authorUsername: currentUser.username,
         text: inserted.text,
         createdAt: new Date(inserted.created_at).getTime(),
@@ -208,7 +218,8 @@ export default function PostDetailPage() {
       warmPeople([currentUser.username]);
       adjustCommentCount(1);
       setCommentText("");
-      showToast("Reply added");
+      setReplyTarget(null);
+      showToast(replyTarget ? "Reply added" : "Comment added");
     } catch (error) {
       console.error("Add post reply failed:", error);
       showToast("Couldn't send your reply — check your connection", "error");
@@ -234,7 +245,10 @@ export default function PostDetailPage() {
 
     try {
       await deleteComment(comment.id);
-      setComments((previous) => (previous || []).filter((item) => item.id !== comment.id));
+      setComments((previous) => (previous || [])
+        .filter((item) => item.id !== comment.id)
+        .map((item) => item.parentCommentId === comment.id ? { ...item, parentCommentId: null } : item));
+      if (replyTarget?.id === comment.id) setReplyTarget(null);
       adjustCommentCount(-1);
       showToast("Reply deleted");
       deleteTriggerRef.current = commentInputRef.current;
@@ -315,8 +329,13 @@ export default function PostDetailPage() {
               ) : (
                 comments.map((comment) => {
                   const person = getPerson(comment.authorUsername);
+                  const commentDepth = getCommentDepth(comment, comments);
                   return (
-                    <article className="post-detail-comment" key={comment.id}>
+                    <article
+                      className={`post-detail-comment${commentDepth ? " post-detail-comment-nested" : ""}`}
+                      key={comment.id}
+                      style={commentDepth ? { marginLeft: `${Math.min(commentDepth * 14, 42)}px` } : undefined}
+                    >
                       <Avatar person={person} size="sm" />
                       <div className="post-detail-comment-body">
                         <div className="post-detail-comment-meta">
@@ -329,21 +348,23 @@ export default function PostDetailPage() {
                             {person.name}
                           </button>
                           <span className="post-detail-comment-time">{timeAgo(comment.createdAt)}</span>
+                          <button type="button" className="post-detail-reply-trigger" onClick={() => startReply(comment)} disabled={sendingComment}>Reply</button>
                         </div>
                         <div className="post-detail-comment-text">{comment.text}</div>
                       </div>
                       <ContentSafetyMenu
-                        targetType="reply"
+                        targetType={comment.parentCommentId ? "reply" : "comment"}
                         targetId={comment.id}
                         reportedUserId={comment.authorId}
                         targetAuthorId={comment.authorId}
                         targetUsername={comment.authorUsername}
-                        targetLabel="reply"
+                        targetLabel={comment.parentCommentId ? "reply" : "comment"}
                         canDeleteTarget={canDeleteComment(comment)}
                         onDelete={(triggerElement) => handleDeleteComment(comment, triggerElement)}
                         onBlocked={(blockedUserId) => {
                           const removedCount = (comments || []).filter((item) => item.authorId === blockedUserId).length;
                           setComments((previous) => (previous || []).filter((item) => item.authorId !== blockedUserId));
+                          setReplyTarget((target) => target?.authorId === blockedUserId ? null : target);
                           if (visiblePost?.authorId === blockedUserId) {
                             if (location.key === "default") navigate("/feed", { replace: true });
                             else navigate(-1);
@@ -361,20 +382,26 @@ export default function PostDetailPage() {
             <form className="post-detail-reply-form" onSubmit={handleSubmitComment}>
               <Avatar person={currentUser} size="sm" />
               <div className="post-detail-reply-editor">
+                {replyTarget && (
+                  <div className="post-detail-reply-context">
+                    <span>Replying to {replyTarget.authorUsername && replyTarget.authorUsername !== "unknown" ? `@${replyTarget.authorUsername}` : getPerson(replyTarget.authorUsername).name}</span>
+                    <button type="button" onClick={() => setReplyTarget(null)} disabled={sendingComment}>Cancel</button>
+                  </div>
+                )}
                 <textarea
                   ref={commentInputRef}
                   className="post-textarea"
                   value={commentText}
                   maxLength={MAX_COMMENT_LENGTH}
                   onChange={(event) => setCommentText(event.target.value)}
-                  placeholder="Post a reply…"
+                  placeholder={replyTarget ? `Reply to ${replyTarget.authorUsername && replyTarget.authorUsername !== "unknown" ? `@${replyTarget.authorUsername}` : "this comment"}…` : "Post a reply…"}
                   aria-label="Write a reply"
                   disabled={sendingComment}
                 />
                 <div className="post-detail-reply-actions">
                   <span className="post-detail-char-count">{commentText.length}/{MAX_COMMENT_LENGTH}</span>
                   <button type="submit" className="btn btn-primary" disabled={!commentText.trim() || sendingComment} style={{ width: "auto", padding: "9px 16px" }}>
-                    {sendingComment ? "Replying…" : "Reply"}
+                    {sendingComment ? "Sending…" : replyTarget ? "Send reply" : "Comment"}
                   </button>
                 </div>
               </div>
