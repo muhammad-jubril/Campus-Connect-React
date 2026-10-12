@@ -180,10 +180,10 @@ begin
   end loop;
 
   if not exists (
-    select 1 from pg_constraint c
-    where c.conrelid='public.marketplace_listings'::regclass and c.contype='f'
-      and c.confrelid='public.profiles'::regclass
-      and seller_attnum = any(c.conkey)
+    select 1 from pg_constraint con
+    where con.conrelid='public.marketplace_listings'::regclass and con.contype='f'
+      and con.confrelid='public.profiles'::regclass
+      and seller_attnum = any(con.conkey)
   ) then
     alter table public.marketplace_listings
       add constraint marketplace_listings_seller_profile_fkey
