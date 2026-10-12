@@ -1,9 +1,8 @@
 import { supabase } from "./client";
 import { normalizeFollowError } from "../../utils/followRelationshipErrors";
+import { followUser, unfollowUser } from "./follows";
 
-const FOLLOW_TABLE = "follows";
-const PROFILE_COLUMNS = "id,username,name,avatar_url,faculty,department,level,bio";
-const MAX_PAGE_SIZE = 50;
+const MAX_PAGE_SIZE = 100;
 
 function throwFollowError(error) {
   if (error) throw normalizeFollowError(error);
@@ -22,91 +21,50 @@ async function ensureNoBlockBetweenViewerAndProfile(profileId, viewerId) {
   }
 }
 
-/**
- * Loads real totals and the viewer's relationship with the profile. This expects
- * the backend contract documented in PROFILE-FOLLOWING-BACKEND-CONTRACT.md.
- * A missing table is surfaced as an error, never interpreted as zero follows.
- */
+/** Counts and relationship flags come from the authenticated, block-aware RPC. */
 export async function getProfileFollowSummary(profileId, viewerId) {
   if (!profileId || !viewerId) throw new Error("Sign in to view follower information.");
 
   await ensureNoBlockBetweenViewerAndProfile(profileId, viewerId);
 
-  const followersQuery = supabase
-    .from(FOLLOW_TABLE)
-    .select("follower_id", { count: "exact", head: true })
-    .eq("following_id", profileId);
+  const { data, error } = await supabase.rpc("get_follow_counts", {
+    p_profile_id: profileId,
+  });
+  throwFollowError(error);
 
-  const followingQuery = supabase
-    .from(FOLLOW_TABLE)
-    .select("following_id", { count: "exact", head: true })
-    .eq("follower_id", profileId);
-
-  const relationshipQuery = profileId === viewerId
-    ? Promise.resolve({ data: null, error: null })
-    : supabase
-      .from(FOLLOW_TABLE)
-      .select("following_id")
-      .eq("follower_id", viewerId)
-      .eq("following_id", profileId)
-      .maybeSingle();
-
-  const [followersResult, followingResult, relationshipResult] = await Promise.all([
-    followersQuery,
-    followingQuery,
-    relationshipQuery,
-  ]);
-
-  throwFollowError(followersResult.error);
-  throwFollowError(followingResult.error);
-  throwFollowError(relationshipResult.error);
+  const summary = data?.[0];
+  if (!summary) throw new Error("The profile's follow information is unavailable.");
 
   return {
-    followers: Number(followersResult.count) || 0,
-    following: Number(followingResult.count) || 0,
-    isFollowing: Boolean(relationshipResult.data),
+    followers: Number(summary.followers_count) || 0,
+    following: Number(summary.following_count) || 0,
+    isFollowing: Boolean(summary.is_following),
+    isFollowedBy: Boolean(summary.is_followed_by),
   };
 }
 
-/** Follow insertion is protected by the server's unique pair constraint and RLS. */
+/** Compatibility wrapper; identity is derived from auth.uid() inside the RPC. */
 export async function followStudent(viewerId, targetId) {
   if (!viewerId || !targetId || viewerId === targetId) {
     throw new Error("You can't follow this profile.");
   }
-
   await ensureNoBlockBetweenViewerAndProfile(targetId, viewerId);
-
-  // The database derives follower_id from auth.uid(); table grants intentionally
-  // allow the client to provide only the destination account.
-  const { error } = await supabase.from(FOLLOW_TABLE).insert({
-    following_id: targetId,
-  });
-
-  // A race can happen if another tab already completed the same follow. The
-  // unique pair is authoritative; duplicate insertion is an idempotent success.
-  if (error?.code === "23505") return;
-  throwFollowError(error);
+  return followUser(targetId);
 }
 
+/** Compatibility wrapper; only the authenticated caller's outgoing edge is removed. */
 export async function unfollowStudent(viewerId, targetId) {
   if (!viewerId || !targetId || viewerId === targetId) {
     throw new Error("You can't unfollow this profile.");
   }
-
-  await ensureNoBlockBetweenViewerAndProfile(targetId, viewerId);
-
-  const { error } = await supabase
-    .from(FOLLOW_TABLE)
-    .delete()
-    .eq("follower_id", viewerId)
-    .eq("following_id", targetId);
-
-  throwFollowError(error);
+  // Unfollow is intentionally allowed after a block so users can clean up
+  // their outgoing edge; the RPC still limits the deletion to auth.uid().
+  return unfollowUser(targetId);
 }
 
 /**
- * Fetch one page of real follow relationships, then load visible profile cards.
- * Profiles are read separately to avoid relying on an unverified embedded join.
+ * Fetch one page through the backend's block-aware list RPC. Counts come from
+ * the matching count RPC; no relationship-table or client profile join is used.
  */
 export async function getProfileConnectionPage(
   profileId,
@@ -121,63 +79,49 @@ export async function getProfileConnectionPage(
 
   await ensureNoBlockBetweenViewerAndProfile(profileId, viewerId);
 
-  const safeOffset = Math.max(0, Math.floor(Number(offset) || 0));
+  const safeOffset = Math.max(0, Math.min(1_000_000, Math.floor(Number(offset) || 0)));
   const safeLimit = Math.min(MAX_PAGE_SIZE, Math.max(1, Math.floor(Number(limit) || 30)));
-  const relationColumn = connectionType === "followers" ? "following_id" : "follower_id";
-  const profileIdColumn = connectionType === "followers" ? "follower_id" : "following_id";
+  const listRpc = connectionType === "followers" ? "get_followers" : "get_following";
 
-  const { data: relationships, error, count } = await supabase
-    .from(FOLLOW_TABLE)
-    .select("id,follower_id,following_id,created_at", { count: "exact" })
-    .eq(relationColumn, profileId)
-    .order("created_at", { ascending: false })
-    .order("id", { ascending: false })
-    .range(safeOffset, safeOffset + safeLimit - 1);
+  const [listResult, countResult] = await Promise.all([
+    supabase.rpc(listRpc, {
+      p_profile_id: profileId,
+      p_limit: safeLimit,
+      p_offset: safeOffset,
+    }),
+    supabase.rpc("get_follow_counts", { p_profile_id: profileId }),
+  ]);
 
-  throwFollowError(error);
+  throwFollowError(listResult.error);
+  throwFollowError(countResult.error);
 
-  const rows = relationships || [];
-  const profileIds = rows.map((row) => row[profileIdColumn]).filter(Boolean);
+  const countSummary = countResult.data?.[0];
+  if (!countSummary) throw new Error("The profile's follow information is unavailable.");
 
-  if (!profileIds.length) {
-    const total = Number(count) || 0;
-    const nextOffset = safeOffset + rows.length;
-    return {
-      people: [],
-      count: total,
-      nextOffset,
-      hasMore: count == null ? rows.length === safeLimit : nextOffset < total,
-    };
-  }
+  const rows = listResult.data || [];
+  const people = rows.map((row) => ({
+    id: row.id,
+    username: row.username,
+    name: row.name || row.username || "Campus Connect student",
+    avatarDataUrl: row.avatar_url || "",
+    faculty: row.faculty || "",
+    department: row.department || "",
+    level: row.level || "",
+    bio: row.bio || "",
+    followedAt: row.followed_at || null,
+    isFollowing: Boolean(row.is_following),
+    isFollowedBy: Boolean(row.is_followed_by),
+  }));
 
-  const { data: profiles, error: profileError } = await supabase
-    .from("profiles")
-    .select(PROFILE_COLUMNS)
-    .in("id", [...new Set(profileIds)]);
-
-  throwFollowError(profileError);
-  const profilesById = new Map((profiles || []).map((profile) => [profile.id, profile]));
-  const people = profileIds
-    .map((id) => profilesById.get(id))
-    .filter(Boolean)
-    .map((profile) => ({
-      id: profile.id,
-      username: profile.username,
-      name: profile.name || profile.username || "Campus Connect student",
-      avatarDataUrl: profile.avatar_url || "",
-      faculty: profile.faculty || "",
-      department: profile.department || "",
-      level: profile.level || "",
-      bio: profile.bio || "",
-    }));
-
+  const total = Number(connectionType === "followers"
+    ? countSummary.followers_count
+    : countSummary.following_count) || 0;
   const nextOffset = safeOffset + rows.length;
-  const total = Number(count) || 0;
 
   return {
     people,
     count: total,
     nextOffset,
-    hasMore: count == null ? rows.length === safeLimit : nextOffset < total,
+    hasMore: nextOffset < total && rows.length === safeLimit,
   };
 }

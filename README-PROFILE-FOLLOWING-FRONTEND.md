@@ -14,11 +14,11 @@
 2. Restart Vite (`Ctrl+C`, then `npm run dev`) and check the profile pages.
 3. Run `npm test`, `npm run lint`, and `npm run build` in your full project.
 
-## Backend migration — required before real follows work
+## Backend integration — required before real follows work
 
-Apply `supabase/migrations/20261012170000_profile_following_backend.sql` after the base schema, content-safety, and notification migrations. It creates or aligns `public.follows`, restricts relationship reads to unblocked pairs, restricts writes to the signed-in follower, and attaches source-keyed follow notification generation. Use `PROFILE-FOLLOWING-BACKEND-CONTRACT.md` for the expected query and RLS contract.
+Use the backend RPC contract in PR #5, including `supabase/migrations/20261012170749_follow_operations_and_profile_queries.sql`. The frontend calls `follow_student`, `unfollow_student`, `get_follow_counts`, `get_followers`, and `get_following`; it must not write directly to `public.follows`. Apply the PR's relationship/notification migrations in order and use `PROFILE-FOLLOWING-BACKEND-CONTRACT.md` for the exact RPC arguments and result shape.
 
-The profile shows an em dash and disables follow actions when follow data cannot be loaded; it never treats a missing backend table as zero relationships or successful writes.
+The profile shows an em dash and disables follow actions when follow data cannot be loaded; it never treats a missing table or RPC as zero relationships or successful writes. Database RPCs derive the acting user from `auth.uid()` and return booleans so repeated requests are reflected accurately in the UI.
 
 Suggested commit message after local verification:
 

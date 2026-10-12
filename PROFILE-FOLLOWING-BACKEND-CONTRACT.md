@@ -1,74 +1,42 @@
-# Profile followers/following — backend integration contract
+# Campus Connect — followers/following RPC contract
 
-## Source review status
+## Current integration target
 
-The frontend reads and writes follow relationships through `public.follows`; migration `supabase/migrations/20261012170000_profile_following_backend.sql` now provides the matching table contract, ownership grants, block-aware RLS, indexes, and server-generated follow notifications. The UI deliberately shows an em dash (not a misleading zero) when the relationship data cannot be loaded, and disables follow actions until the signed-in viewer's relationship state is known.
+The frontend is aligned with the backend relationship API in PR #5. It must not write directly to `public.follows`: the backend revokes authenticated INSERT/DELETE privileges and exposes authenticated RPCs that derive the acting user from `auth.uid()`.
 
-The migration is forward-only and idempotent for the expected `public.follows` contract. It attaches the follow notification trigger explicitly because the older notification pipeline only attached that trigger when a follows table already existed at the time that earlier migration ran.
+Apply `supabase/migrations/20261012170749_follow_operations_and_profile_queries.sql` from `feat/notifications-relationship-backend` after the notification relationship migration. Confirm the PR's migrations are applied and the corresponding functions are present before expecting these clients to work.
 
-## Relationship table expected by the frontend
+## Supported RPCs
 
-```sql
-public.follows (
-  id uuid primary key default gen_random_uuid(),
-  follower_id uuid not null default auth.uid() references public.profiles(id) on delete cascade,
-  following_id uuid not null references public.profiles(id) on delete cascade,
-  created_at timestamptz not null default now(),
-  unique (follower_id, following_id),
-  check (follower_id <> following_id)
-)
-```
+| Action | RPC and arguments | Return value |
+|---|---|---|
+| Follow | `follow_student({ p_following_id })` | `true` only when a new relationship was created; `false` if it already existed |
+| Unfollow | `unfollow_student({ p_following_id })` | `true` only when the caller's outgoing relationship was removed; `false` if nothing was removed |
+| Counts and viewer state | `get_follow_counts({ p_profile_id })` | Table-shaped array with a single row; client reads `data?.[0]` |
+| Followers page | `get_followers({ p_profile_id, p_limit, p_offset })` | Paginated profile summary rows |
+| Following page | `get_following({ p_profile_id, p_limit, p_offset })` | Paginated profile summary rows |
 
-Useful read indexes:
+The `get_follow_counts` row contains `followers_count`, `following_count`, `is_following`, and `is_followed_by`. The list RPCs return `id`, `username`, `name`, `avatar_url`, `faculty`, `department`, `level`, `bio`, `followed_at`, `is_following`, and `is_followed_by`. The backend caps page size at 100; the UI currently requests 30 rows per page.
 
-```sql
-create index follows_following_created_idx
-  on public.follows (following_id, created_at desc, id desc, follower_id);
-create index follows_follower_created_idx
-  on public.follows (follower_id, created_at desc, id desc, following_id);
-```
+## UI/service behaviour
 
-The unique follower/following pair makes a follow unique and makes repeated insert requests safe at the database boundary. The `id` value is used by the current follow-status query and as the notification source identity. `created_at` supports stable newest-first list pages.
+- Profile counts and follow state use `get_follow_counts`; counts are not inferred from the currently loaded page.
+- Follow/unfollow uses only `p_following_id`. A caller ID supplied by React is never used to authorise a database mutation.
+- The mutation boolean is respected: a repeated follow does not show a false “new follow” success, and repeated unfollow does not claim a relationship was removed.
+- Connection lists call `get_followers` or `get_following` and get their visible totals from `get_follow_counts`. The client does not query `public.follows` or build a profile join itself.
+- Missing RPC errors are surfaced as a backend-migration message rather than showing zero counts. A missing `follows` table is reported separately.
+- The RPCs apply blocking restrictions and return public profile fields only. Their security boundary is the database; client-side checks are UX only.
 
-## Required RLS and grants
+## Notification behaviour
 
-The checked-in migration enables RLS on `public.follows`, grants authenticated users SELECT plus INSERT on only `following_id` and DELETE, and removes older policies before installing the scoped policies. The SELECT policy permits complete follower/following lists for unblocked student pairs, while hiding edges where either endpoint is blocked by the viewer. INSERT derives `follower_id` from `auth.uid()`, rejects self-follows and blocked targets, and a unique constraint/index prevents duplicate edges. DELETE permits only the signed-in follower to remove their own outgoing edge.
+The backend already owns follow notifications: only a newly inserted row in `public.follows` fires `follows_notify_recipient` / `notify_on_follow_relationship()`. The source is the follow row ID. The frontend must not insert into `public.notifications`; duplicate follow RPC requests return `false` and do not produce an additional follow notification. Unfollow does not create a notification.
 
-For production, confirm these policies and grants after applying the migration. The relationship table should:
+## Verification checklist
 
-- `SELECT` only exposes relationship rows whose two student profiles are visible to the caller. Reuse the existing `public.is_user_blocked(uuid)` restriction for both endpoints so an account blocked in either direction does not appear in another student's list or count.
-- `INSERT` requires `follower_id = (select auth.uid())`, forbids self-follows, requires an existing target profile, and rejects a mutual-block pair using `public.is_user_blocked(following_id) = false`.
-- `DELETE` only allows a student to remove their own outgoing edge (`follower_id = (select auth.uid())`). Backend policy should not permit one user to delete another user's follow edge.
-- No client can update `follower_id`, `following_id`, or `created_at` to forge a different relationship. The database uniqueness/check constraints remain authoritative even when two tabs submit at once.
-- Authenticated users receive only the column/table privileges required by those RLS policies. The service sends its signed-in user ID, but RLS must validate ownership against `auth.uid()`; never trust the client-supplied ID alone.
+1. Apply the follow operations migration in PR #5 after the base relationship/notification migrations.
+2. Check that authenticated direct `INSERT`/`DELETE` on `public.follows` are denied and the required RPCs are executable by authenticated users only.
+3. With two test accounts, test new and repeated follow, unfollow, counts, list contents and pagination.
+4. Test self-follow, deleted profiles, mutual blocking, and attempts to call the RPCs while signed out.
+5. Confirm only a newly created relationship generates one follow notification and unfollow generates none.
 
-The existing `public.is_user_blocked(p_other_user uuid)` RPC is defined by the checked-in content-safety migration. The frontend calls it before reading another student's follow data or changing a relationship, but backend RLS remains the actual security boundary.
-
-## Frontend query contract
-
-The frontend uses `src/services/supabase/profileFollows.js`:
-
-| Operation | Query contract |
-|---|---|
-| Profile counts | Count rows with `following_id = profile_id` for Followers and `follower_id = profile_id` for Following. These use exact count queries rather than fetching every row. |
-| Current viewer state | Find a row with `follower_id = auth user id` and `following_id = profile id`. |
-| Follow | Insert `{ following_id }`; PostgreSQL derives `follower_id` from `auth.uid()`. Duplicate-pair error `23505` is treated as an idempotent success after the backend unique key arbitrates the race. |
-| Unfollow | Delete only where both `follower_id` and `following_id` match the viewer and target. |
-| List pages | Select relationship rows newest first, tie-breaking by `id` descending, in pages of 30; load visible public metadata using the returned IDs from `profiles`. The stable tie-break avoids skipped/repeated rows when multiple follows have the same transaction timestamp. |
-
-Profile cards expect existing `profiles` columns `id`, `username`, `name`, `avatar_url`, `faculty`, `department`, `level`, and `bio`. The existing `personFromProfileRow` mapping handles the profile page's regular profile shape.
-
-## Blocking and notification expectations
-
-- A viewer-to-profile block pair makes counts/list contents unavailable and prevents Follow/Unfollow in the frontend. Enforce that restriction in RLS as well; the client-side RPC check is not sufficient security by itself.
-- The migration generates follow notifications after successful relationship inserts, suppresses bilateral-block/self events, keys each notification to the follow row through `source_id`, and attaches the trigger even when the prior notification migration ran before the follows table existed.
-- Follow counts must derive from stored relationships; do not return a mock value when the table is missing.
-
-## Verification checklist for deployment
-
-1. Apply `supabase/migrations/20261012170000_profile_following_backend.sql` after the base schema, content-safety and notifications migrations in the target Supabase project.
-2. Sign in with two test accounts and verify following creates exactly one row, unfollowing deletes only the caller's row, and repeated requests cannot create duplicates.
-3. Verify counts change after each operation and in a second browser/session.
-4. Verify follower/following pagination returns the correct profiles in newest-first order.
-5. Verify self-follow and following/unfollowing across either direction of a block are rejected, and blocked accounts are absent from list reads.
-6. Verify unauthorized direct table writes fail even if the frontend is bypassed.
+Source-level tests cannot replace these live Supabase checks.

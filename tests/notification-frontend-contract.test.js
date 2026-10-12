@@ -32,10 +32,10 @@ test("public follow profile supports server-owned follow and owner-filtered unfo
   ]);
   assert.match(page, /getProfileFollowSummary\(person\.id, currentUser\.id\)/);
   assert.match(page, /followUser\(person\.id\)/);
-  assert.match(page, /unfollowUser\(currentUser\.id, person\.id\)/);
-  assert.match(service, /insert\(\{ following_id: followingId \}\)/);
-  assert.doesNotMatch(service, /insert\(\{[^}]*follower_id/s);
-  assert.match(service, /eq\("follower_id", followerId\)[\s\S]*?eq\("following_id", followingId\)/);
+  assert.match(page, /unfollowUser\(person\.id\)/);
+  assert.match(service, /rpc\("follow_student", \{[\s\S]*?p_following_id: followingId/);
+  assert.match(service, /rpc\("unfollow_student", \{[\s\S]*?p_following_id: followingId/);
+  assert.doesNotMatch(service, /\.from\(["']follows["']\)/);
 });
 
 test("direct Supabase Edge Function calls send both public apikey and the signed-in bearer token", async () => {

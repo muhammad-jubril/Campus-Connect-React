@@ -1,6 +1,8 @@
-const MISSING_RELATION_CODES = new Set(["42P01", "PGRST205", "PGRST202"]);
+const MISSING_RELATION_CODES = new Set(["42P01", "PGRST205"]);
+const MISSING_RPC_CODES = new Set(["PGRST202", "42883"]);
+const FOLLOW_RPC_NAMES = "follow_student|unfollow_student|get_follow_counts|get_followers|get_following";
 
-/** Convert absent follow schema/RPCs into an actionable backend-integration message. */
+/** Convert missing backend schema/RPCs and permission failures into actionable messages. */
 export function normalizeFollowError(error) {
   const message = String(error?.message || "");
   const code = String(error?.code || "");
@@ -11,7 +13,16 @@ export function normalizeFollowError(error) {
     /could not find the table\s+["']?public\.(follows|follow_relationships)/i.test(message)
   ) {
     return new Error(
-      "Followers and following aren't available yet. The backend needs to deploy the follows table, row-level security policies, and required grants."
+      "Followers and following aren't available yet. Deploy the follow relationship table and its security policies first."
+    );
+  }
+
+  if (
+    MISSING_RPC_CODES.has(code) ||
+    new RegExp(`could not find the function\\s+["']?public\\.(${FOLLOW_RPC_NAMES})`, "i").test(message)
+  ) {
+    return new Error(
+      "Followers and following need the latest backend migration. Deploy the follow operations RPCs before using this feature."
     );
   }
 
@@ -19,7 +30,7 @@ export function normalizeFollowError(error) {
     return new Error("This follow action isn't allowed. Check the account's privacy and blocking restrictions.");
   }
 
-  if (code === "42501" || code === "P0001") {
+  if (code === "42501" || code === "P0001" || code === "23514" || code === "23503") {
     return new Error(
       message || "This follow action isn't allowed. Check the account's privacy and blocking restrictions."
     );

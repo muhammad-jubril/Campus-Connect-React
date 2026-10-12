@@ -168,11 +168,11 @@ export default function ProfilePage() {
     setFollowWorking(true);
     try {
       if (isFollowing) {
-        await unfollowUser(currentUser.id, person.id);
-        showToast(`Unfollowed @${person.username}`);
+        const changed = await unfollowUser(person.id);
+        showToast(changed ? `Unfollowed @${person.username}` : `You were already not following @${person.username}`);
       } else {
-        await followUser(person.id);
-        showToast(`Following @${person.username}`);
+        const changed = await followUser(person.id);
+        showToast(changed ? `Following @${person.username}` : `You're already following @${person.username}`);
       }
       // Refresh the authoritative relationship and visible counts after the write.
       setFollowRetryKey((key) => key + 1);
