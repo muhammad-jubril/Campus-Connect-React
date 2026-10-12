@@ -68,3 +68,19 @@ test("comment thread layout handles nested, orphaned, and cyclic relationships s
   ];
   assert.ok(getCommentDepth(cycle[0], cycle) <= 4);
 });
+
+test("notifications page omits the two unwanted explanatory helper texts", async () => {
+  const page = await readFile(new URL("src/pages/NotificationsPage.jsx", root), "utf8");
+  assert.doesNotMatch(page, /Keep up with activity on your posts and campus profile/i);
+  assert.doesNotMatch(page, /Grouped activity keeps each individual notification available/i);
+  assert.doesNotMatch(page, /notifications-footer-note/);
+});
+
+test("push settings card keeps a compact desktop action and a full-width mobile action", async () => {
+  const css = await readFile(new URL("src/styles/notifications.css", root), "utf8");
+  assert.match(css, /\.notifications-push-card\s*>\s*\.notifications-push-button\s*\{[\s\S]*?width:\s*auto;/);
+  assert.match(css, /grid-template-columns:\s*44px\s+minmax\(0,\s*1fr\)\s+max-content/);
+  assert.match(css, /grid-template-columns:\s*36px\s+minmax\(0,\s*1fr\)/);
+  assert.match(css, /grid-column:\s*1\s*\/\s*-1/);
+  assert.match(css, /justify-self:\s*stretch/);
+});

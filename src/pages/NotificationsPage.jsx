@@ -180,7 +180,6 @@ export default function NotificationsPage() {
         <div className="notifications-title-copy">
           <span className="eyebrow">CAMPUS CONNECT</span>
           <h1 className="display">Notifications</h1>
-          <p>Keep up with activity on your posts and campus profile.</p>
         </div>
         <button
           type="button"
@@ -268,9 +267,6 @@ export default function NotificationsPage() {
         />
       )}
 
-      <p className="notifications-footer-note">
-        Grouped activity keeps each individual notification available, so you can mark activities as read one at a time.
-      </p>
     </main>
   );
 }
