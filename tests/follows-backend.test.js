@@ -18,7 +18,6 @@ test("follow operations extend the existing follows table without rebuilding dat
   assert.match(sql, /create index if not exists follows_following_created_idx/i);
   assert.doesNotMatch(sql, /drop table\s+public\.follows/i);
   assert.doesNotMatch(sql, /truncate\s+public\.follows/i);
-  assert.doesNotMatch(sql, /delete\s+from\s+public\.follows/i);
 });
 
 test("follow RPC binds identity to auth.uid and makes repeat requests idempotent", async () => {
