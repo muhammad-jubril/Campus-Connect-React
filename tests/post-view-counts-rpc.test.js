@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 
 const root = new URL("../", import.meta.url);
-const countMigrationUrl = new URL("supabase/migrations/20261012220000_post_view_counts_for_feed.sql", root);
+const countMigrationUrl = new URL("supabase/migrations/20261012232526_post_view_counts_for_feed.sql", root);
 const recordMigrationUrl = new URL("supabase/migrations/20261012040129_content_safety_ownership_and_view_guards.sql", root);
 const baseViewMigrationUrl = new URL("supabase/migrations/20261010231946_post_views.sql", root);
 
