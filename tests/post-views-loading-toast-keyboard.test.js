@@ -17,7 +17,7 @@ test("post feed cards render actual post view counts when the safe aggregate que
   const [card, service, migration] = await Promise.all([
     read("src/components/feed/PostCard.jsx"),
     read("src/services/supabase/posts.js"),
-    read("supabase/migrations/20261012220000_post_view_counts_for_feed.sql"),
+    read("supabase/migrations/20261012232526_post_view_counts_for_feed.sql"),
   ]);
   assert.match(card, /post\.viewCount !== null && post\.viewCount !== undefined/);
   assert.match(card, /aria-label=\{`\$\{post\.viewCount\} views`\}/);
