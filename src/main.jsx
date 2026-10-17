@@ -22,7 +22,7 @@ import "./styles/desktop-alignment.css";
 import "./styles/desktop-layout.css";
 // Provides the active signup-consent styling and legal-page layout/scroll rules.
 import "./styles/legal-consent.css";
-
+import "./styles/ui-consistency.css";
 createRoot(document.getElementById("root")).render(
   <StrictMode>
     <BrowserRouter>

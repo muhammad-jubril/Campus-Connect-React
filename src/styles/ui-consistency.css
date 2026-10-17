@@ -1,0 +1,222 @@
+/*
+ * Campus Connect - UI consistency pass.
+ *
+ * HOW THIS FILE IS SAFE TO ADD
+ *  - It is purely additive. No existing CSS or component is edited.
+ *  - It is imported LAST (see UI-CONSISTENCY-FIXES.md, step 1), so equal
+ *    specificity wins here and no rule needs `!important`, except the two
+ *    marked below that have to beat inline `style` attributes.
+ *  - Every rule targets a class or markup pattern that already exists. If you
+ *    later rename or remove one of them, that single rule simply stops
+ *    matching; nothing else is affected.
+ *  - To undo any fix, delete its block (each is numbered and independent).
+ *
+ * TYPE SCALE USED BY THIS FILE (taken from what the app already does most)
+ *    page title      25px  Sora        (feed, search, create, edit, settings)
+ *    page subtitle   14px  muted ink   (search, blocked accounts, marketplace)
+ *    form/search     14px
+ *    primary button  42px tall, 12.5px Sora
+ */
+
+/* ------------------------------------------------------------------ */
+/* 1. Explore "Coming soon" card got squashed on shorter desktops.      */
+/*    (This fix was missing from the latest zip.)                       */
+/* ------------------------------------------------------------------ */
+@media (min-width: 1000px) {
+  .explore-body > * {
+    flex: 0 0 auto;
+  }
+
+  .explore-hero {
+    min-height: 150px;
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/* 2. Confirm / report dialogs opened from a post were trapped inside   */
+/*    the post card (dark box only over that card, dialog glued to it). */
+/*    Cause: the card gets `transform` on hover, and a transformed      */
+/*    parent becomes the containing block for `position: fixed`.        */
+/*    While a dialog is inside the card, drop the transform.            */
+/* ------------------------------------------------------------------ */
+.post-card:has([role="dialog"]),
+.post-card:has([role="dialog"]):hover {
+  transform: none;
+  animation: none;
+}
+
+/* ------------------------------------------------------------------ */
+/* 3. Post header: long department names, "1D (edited)" and the menu    */
+/*    fought for width, so the name column wrapped onto 3 lines.        */
+/* ------------------------------------------------------------------ */
+.post-card-head > div:nth-child(2) {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.post-card-author,
+.post-card-sub {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ------------------------------------------------------------------ */
+/* 4. One page-title size and one subtitle style across every page.    */
+/* ------------------------------------------------------------------ */
+.content-safety-page h1.display {
+  font-size: 25px;
+  line-height: 1.2;
+}
+
+.content-safety-page .subtitle {
+  margin-top: 7px;
+  font-size: 14px;
+}
+
+.marketplace-header h1.display,
+.marketplace-header h1 {
+  font-size: 25px;
+  line-height: 1.2;
+}
+
+.notifications-title-copy h1 {
+  font-size: 25px;
+}
+
+/* Edit profile used body-size dark text where every other page uses the
+   muted 14px subtitle. */
+.edit-profile-page .task-title > p {
+  margin: 7px 0 0;
+  color: rgba(28, 27, 23, 0.6);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.profile-connections-heading .subtitle {
+  font-size: 14px;
+}
+
+/* Create post: the gap under the title was ~38px, every other page ~7px. */
+.create-post-page .task-header {
+  margin-bottom: 8px;
+}
+
+/* ------------------------------------------------------------------ */
+/* 5. Marketplace content sat 13px further in than every other page    */
+/*    (the shell already pads the page; the page padded it again).     */
+/* ------------------------------------------------------------------ */
+.marketplace-page {
+  padding-left: 0;
+  padding-right: 0;
+}
+
+/* ------------------------------------------------------------------ */
+/* 6. Coming-soon pages opened as screens (Groups, Communities, Lost &  */
+/*    Found, Help, Chats) were indented 24px more than other screens.   */
+/*    The indent is an inline style, so this one needs !important.      */
+/* ------------------------------------------------------------------ */
+.screen-page-inner > div[style*="padding: 24px"] {
+  padding: 0 0 24px !important;
+}
+
+/* ------------------------------------------------------------------ */
+/* 7. Search screen: "CAMPUS DISCOVERY" sat beside "Trending on         */
+/*    campus" in a squeezed row. Every other heading stacks the eyebrow */
+/*    above the title.                                                  */
+/* ------------------------------------------------------------------ */
+.explore-trending-heading {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+}
+
+/* ------------------------------------------------------------------ */
+/* 8. Feed search bar: placeholder was 12.5px, every input is 14px.    */
+/* ------------------------------------------------------------------ */
+.home-search-copy {
+  font-size: 14px;
+  color: rgba(28, 27, 23, 0.5);
+}
+
+/* ------------------------------------------------------------------ */
+/* 9. Profile card                                                      */
+/* ------------------------------------------------------------------ */
+/* "Blocked accounts" is a secondary action but looked identical to the
+   primary "Edit profile" button stacked directly above it. */
+.profile-edit-btn + .profile-edit-btn {
+  margin-top: 8px;
+  border: 1px solid rgba(30, 92, 62, 0.18);
+  background: rgba(30, 92, 62, 0.07);
+  color: var(--primary);
+  box-shadow: none;
+}
+
+/* Follow / Unfollow was 33px tall with 10px text; Edit profile is 42px. */
+.profile-follow-btn {
+  min-height: 42px;
+  font-size: 12.5px;
+}
+
+@media (max-width: 420px) {
+  .profile-follow-btn {
+    min-height: 42px;
+    padding: 0 16px;
+    font-size: 12.5px;
+  }
+
+  /* Stat captions were 7px on phones. */
+  .profile-page .profile-stats strong {
+    font-size: 13px;
+  }
+
+  .profile-page .profile-stats span {
+    font-size: 8.5px;
+    letter-spacing: 0.02em;
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/* 10. Marketplace form and listing detail                              */
+/* ------------------------------------------------------------------ */
+/* "Price is negotiable": the checkbox inherited width:100% from the
+   global field rules, so it floated mid-row and squeezed the label. */
+.marketplace-listing-form .field > label.marketplace-checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  margin-top: 12px;
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.marketplace-listing-form .marketplace-checkbox-label input[type="checkbox"] {
+  flex: 0 0 18px;
+  width: 18px;
+  height: 18px;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+}
+
+@media (max-width: 767px) {
+  /* "Message seller" wrapped onto two lines beside the menu and Report
+     button. Give the primary action its own full-width row. */
+  .marketplace-detail-actions .btn.btn-primary {
+    flex: 1 1 100%;
+    white-space: nowrap;
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/* 11. My listings: on phones the header stacks into a column, but the  */
+/*     title block kept its `flex: 1 1 205px`. In a column that 205px   */
+/*     is a HEIGHT, which left a ~100px hole above "Sell an item".    */
+/* ------------------------------------------------------------------ */
+@media (max-width: 560px) {
+  .marketplace-my-listings-header > div:first-child {
+    flex: 0 0 auto;
+  }
+}
